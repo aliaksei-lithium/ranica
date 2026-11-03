@@ -4,6 +4,12 @@ html, body { margin: 0; }
 body { background: var(--desk); }
 .view-kindle, .view-eink { background: var(--paper); }
 
+/* Browser: the sheet ends where the content ends; the A4 height only matters on paper
+   (print media and the print view keep min-height: 297mm from design/ranica.css). */
+@media screen {
+  .desk .sheet { min-height: 0; }
+}
+
 /* Front and back page one under the other on the desk. */
 .desk--stack { flex-direction: column; align-items: center; gap: 24px; }
 
