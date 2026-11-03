@@ -374,30 +374,67 @@
 /* Comic slot (K): reserved, not rendered in v1. 3 panels × 55 × 55 mm. */
 .comic-slot { display: none; }
 
-/* ---------- Page 2: long reads ---------- */
-.sheet--page2 .columns { grid-template-columns: 1fr 1fr; }
-.sheet--page2 .col--right { border-left: 0; padding-left: calc(var(--gutter) / 2); }
-.sheet--page2 .col--left { padding-right: calc(var(--gutter) / 2); }
-.longread { margin-top: var(--space-3); }
-.longread:first-of-type { margin-top: var(--space-2); }
-.longread__title { font-weight: 700; font-size: 13pt; line-height: 15pt; display: block; margin-bottom: var(--space-1); }
+/* ---------- Page 2: the back page ---------- */
+.sheet--page2 { grid-template-rows: auto auto auto 1fr auto; }
+.masthead--page2 { padding-bottom: var(--space-1); }
+.masthead--page2 .masthead__month { font-size: var(--fs-wordmark); }
+.page2-top { display: grid; grid-template-columns: 1fr 58mm; column-gap: var(--gutter); margin-top: var(--space-2); }
+.sheet--page2 .columns { grid-template-columns: 1fr 1fr; margin-top: var(--space-2); border-top: var(--rule-medium) solid var(--rule); }
+.sheet--page2 .col--right { padding-left: var(--gutter); }
+.sheet--page2 .col--left { padding-right: var(--gutter); }
+.page2-top .section { margin-top: 0; }
+.page2-top .label { border-top: 0; padding-top: 0; }
+
+/* Data tables: labels in sans, values in serif at note size; rules, not boxes. */
+.table { width: 100%; border-collapse: collapse; font-family: var(--font-sans); font-size: var(--fs-tag); line-height: 1.25; }
+.table th { text-align: left; font-weight: 600; letter-spacing: 0.06em; text-transform: uppercase; font-size: var(--fs-tag); padding: 0 1.5mm 0.8mm 0; border-bottom: var(--rule-thin) solid var(--rule); vertical-align: bottom; }
+.table tbody th { text-transform: none; letter-spacing: 0.02em; font-weight: 500; color: var(--ink-muted); border-bottom: var(--rule-hair) solid var(--rule-light); padding-top: 0.9mm; }
+.table td { padding: 0.9mm 1.5mm 0.8mm 0; vertical-align: top; border-bottom: var(--rule-hair) solid var(--rule-light); font-family: var(--font-serif); font-size: var(--fs-note); line-height: var(--lh-note); }
+.table .num { font-family: var(--font-sans); font-weight: 500; font-variant-numeric: tabular-nums; white-space: nowrap; }
+.table .muted { color: var(--ink-muted); }
+.week th { width: 11.5%; }
+.week th:first-child { width: 12mm; }
+.week__day { font-weight: 600; }
+.week__date { font-weight: 400; color: var(--ink-muted); letter-spacing: 0; }
+.hours td, .hours th { text-align: right; padding-right: 0; }
+.hours th:first-child, .hours tbody th { text-align: left; }
+.hours td.num { font-size: var(--fs-tag); }
+
+/* In depth: long summaries with a drop cap */
+.rubric--deep { margin-top: var(--space-2); }
+.rubric--deep .label { border-top: var(--rule-hair) solid var(--rule-light); color: var(--ink-muted); }
+.longread { margin-top: var(--space-2); }
+.longread__title { font-weight: 700; font-size: 12pt; line-height: 14pt; display: block; margin-bottom: calc(var(--space-1) - 1pt); }
 .longread__body { text-align: justify; hyphens: auto; }
+.longread__body .tag { white-space: normal; }
 .longread__body::first-letter {
   font-family: var(--font-display); font-weight: 700;
-  font-size: 2.6em; line-height: 0.8; float: left; padding: 0.08em 0.1em 0 0;
+  font-size: 2.55em; line-height: 0.8; float: left; padding: 0.08em 0.1em 0 0;
 }
-.wotd {
-  border-top: var(--rule-medium) solid var(--rule);
-  border-bottom: var(--rule-hair) solid var(--rule);
-  padding: var(--space-1) 0 var(--space-2);
-  margin-top: var(--space-4);
-}
-.wotd .label { border-top: 0; padding-top: 0; }
-.wotd__word { font-family: var(--font-display); font-weight: 700; font-size: 22pt; line-height: 1; display: block; }
-.wotd__gloss { font-family: var(--font-sans); font-size: var(--fs-sun); color: var(--ink-muted); display: block; margin: 2pt 0 var(--space-1); }
+
+/* Telegram digest */
+.digest { margin-top: var(--space-1); }
+.digest__channel { font-family: var(--font-sans); font-weight: 600; font-size: var(--fs-sun); letter-spacing: 0.01em; display: block; }
+.digest__list { margin: 0.5pt 0 0; padding: 0 0 0 3mm; list-style: none; }
+.digest__list li { position: relative; }
+.digest__list li::before { content: "–"; position: absolute; left: -3mm; color: var(--ink-muted); }
+
+/* Coming up */
+.agenda--backlog { grid-template-columns: 14mm 1fr; }
+
+/* Words this week + word of the day */
+.lesson--words { margin-top: var(--space-2); align-self: start; }
+.words-strip { display: grid; grid-template-columns: 52mm 1fr; column-gap: var(--space-4); }
+.words { display: grid; grid-template-columns: 1fr 1fr 1fr; column-gap: var(--space-3); row-gap: 0.5pt; font-size: var(--fs-note); line-height: var(--lh-note); align-content: start; align-items: start; }
+.words .lesson__word { font-size: var(--fs-body); }
+.wotd { border-right: var(--rule-hair) solid var(--rule-light); padding-right: var(--space-3); }
+.wotd__word { font-family: var(--font-display); font-weight: 700; font-size: 18pt; line-height: 1; display: inline; }
+.wotd__gloss { font-family: var(--font-sans); font-size: var(--fs-tag); letter-spacing: 0.02em; color: var(--ink-muted); display: inline; margin-left: 1.5mm; }
+.wotd__example { margin-top: 2pt; }
 .wotd__example { font-style: italic; }
 .wotd__extra { font-size: var(--fs-note); line-height: var(--lh-note); color: var(--ink-muted); margin-top: 2pt; }
-.page-number { font-family: var(--font-sans); font-size: var(--fs-label); letter-spacing: 0.12em; text-transform: uppercase; }
+.page-number { font-family: var(--font-sans); font-weight: 600; letter-spacing: 0.12em; text-transform: uppercase; color: var(--ink); }
+
 
 /* ---------- Browser view: the sheet on a grey desk ---------- */
 .desk {
