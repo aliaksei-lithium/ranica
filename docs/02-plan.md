@@ -68,55 +68,72 @@ Rendering rules:
 - `de` mode with `learner_level: B1`: the editor writes German at B1, glosses rare words in
   parentheses, and keeps sentences under ~15 words.
 
-## 3. Architecture
+## 3. Architecture (Cloudflare, Workers Free plan)
+
+Hosting decision: everything on one Cloudflare account, free tier, see research §6 for the
+limits. The limits that shape the design: **10 ms CPU per Worker invocation and per Workflow
+step**, **10 browser-minutes per day**, **no outbound email on Free** (Resend instead),
+**1 000 KV writes/day** (so KV is not used for state).
 
 ```
-            ┌──────────── scheduler (per user, local time, e.g. 06:30) ───────────┐
-            ▼                                                                      │
- ┌────────────────┐   ┌───────────────┐   ┌──────────────┐   ┌─────────────┐   ┌──▼────────┐
- │ Collectors     │──▶│ Normalizer +  │──▶│ Editor (LLM) │──▶│ Composer    │──▶│ Renderer  │
- │ ics, rss, tg,  │   │ dedupe, cache │   │ JSON in/out  │   │ fit-to-page │   │ Chromium  │
- │ weather, tasks │   └───────────────┘   └──────────────┘   └─────────────┘   └──┬────────┘
- └────────────────┘                                                               │
-                                              html · pdf · png(1-bit) · epub ◀────┘
-                                                        │
-                       ┌──────────────┬─────────────────┼────────────────┬─────────────┐
-                       ▼              ▼                 ▼                ▼             ▼
-                   web /today    email (+Kindle)   printer (IPP/CUPS   e-ink URL   archive
-                                                   or email-to-print)
+ Cron (every 15 min)            Cron (hourly)
+      │                              │
+      ▼                              ▼
+ EditionScheduler Worker        SourceRefresh Workflow
+  D1: users due now              one step per shared source:
+  → Workflow.createBatch()       fetch → parse → dedupe → D1.items
+      │
+      ▼
+ EditionWorkflow (one instance per user per day)
+  step 1  load profile, calendar (ICS fetch+parse), tasks            ─┐ each step:
+  step 2  weather (Open-Meteo)                                         │ ≤10 ms CPU,
+  step 3  items for this user's subscriptions (D1 read, ≤60 items)     │ retries,
+  step 4  vocab due (D1, FSRS)                                         │ state saved
+  step 5  editor: Anthropic via AI Gateway → Brief JSON (validate ids)│
+  step 6  compose: Brief → HTML string, store to R2                    │
+  step 7  render: Browser Run session: load HTML → measure/trim →     │
+          pdf (A4) → pdf (Kindle size) → png (e-ink) → R2             │
+  step 8  deliveries: Resend email (+Kindle), webhook; record in D1   ─┘
+      │
+      ▼
+ Web Worker (Hono + static assets)
+  /today, /editions/:date, /u/:token/today(.png|.pdf), /review (vocab), /settings
+  Auth: Cloudflare Access (OTP e-mail / Google), JWT header → user row in D1
 ```
 
-Key design rules (taken from prior art, section 01 §2):
-1. **Edition = typed JSON blocks** (`Brief`). Collectors produce items, the Editor produces a
-   `Brief`, the Renderer turns a `Brief` into HTML. Nothing downstream talks to the LLM.
-2. **Sources are shared, profiles are private.** A feed or Telegram channel is fetched once
-   per interval for all subscribers; calendar/tasks/context are per user and never cached
-   across users.
-3. **LLM only rewrites and ranks.** Input items carry stable IDs; output references them.
-   Any item in the output that is not in the input is dropped before rendering.
-4. **Deterministic rendering.** Same `Brief` → same page. Makes tests and the archive cheap.
-5. **Fit-to-page by priority**, max 3 render iterations, then hard cut.
+Storage map:
 
-### 3.1 Pipeline per edition
-1. `EditionJob(userId, date)` fires at `wake_time − 30 min` in the user's timezone
-   (db-scheduler / Quartz; one job table, survives restarts).
-2. Collectors run in parallel with per-source timeouts (5 s) and return `List<Item>` or an
-   `Error`.
-3. Normalizer: strip HTML, trim to 400 chars, dedupe (URL hash + title similarity), keep
-   items newer than `freshness_window` (default 30 h), cap at 60 items.
-4. Editor: one `messages` call with structured output → `Brief`. Validate against input IDs.
-   On failure: retry once, then build a **no-LLM fallback Brief** (facts only, no insight).
-5. Composer: assign blocks to template slots, run fit loop.
-6. Renderer: Chromium → `edition.html` (self-contained, fonts inlined), `edition.pdf` (A4),
-   `edition-kindle.pdf` (device page size), `edition.png` (device resolution, 1-bit).
-7. Delivery: fan out to enabled channels; each delivery recorded with status.
-8. Store edition + artifacts; prune artifacts after 90 days.
+| Data | Where | Why |
+|---|---|---|
+| users, profiles, sources, subscriptions, items, vocab, editions (Brief JSON), deliveries | **D1** | relational, 5 M reads/day is plenty, 100 k writes/day is enough with dedupe |
+| edition.html / .pdf / kindle.pdf / .png | **R2** | 10 GB, free egress, served through the Worker |
+| CSS, fonts, settings UI | **Static assets** | free and unlimited |
+| secrets (Anthropic key, Resend key, ICS secret URLs) | Worker secrets (`wrangler secret`) + AES-GCM in D1 for per-user ICS URLs using a server key secret | never in code or logs |
+| schedules | **Cron Triggers** (2 of 5 used) | no per-user cron needed: the scheduler reads D1 for users whose local `wake_time − 30 min` falls in this 15-min window |
 
-### 3.2 Editor contract (LLM)
-System prompt (stable, cached): role, language rules, B1 rules, JSON schema, "never invent".
-User message (volatile): `profile.context_md`, date/time, weather facts, events, tasks,
-items[], vocab_due[], hobby_topics[], sport_rules result.
-Output schema (excerpt):
+Design rules kept from the previous version: typed `Brief` JSON, shared sources, LLM only
+ranks/rewrites supplied items (ids validated), deterministic rendering, priority-based fit-to-page.
+New rules forced by the platform:
+
+6. **One step = one source.** Each step parses at most one feed or channel so it stays under
+   10 ms CPU; the Workflow engine retries a failed step without redoing the others.
+7. **One browser session per edition.** Browser Run allows one new browser per 20 s and 10 min/day;
+   the fit loop, both PDFs and the PNG happen inside the same session (~5–8 s).
+8. **Nothing heavy in the Worker.** 1-bit dithering runs in the page (canvas), XML parsing uses a
+   streaming/regex-light parser (`fast-xml-parser`), HTML templating is string concatenation
+   (`hono/jsx`), JSON schema validation uses a precompiled validator (`typebox` + `ajv` compiled
+   at build time or `valibot`).
+9. **Reads over writes.** Items are written once per source refresh, read many times per user.
+
+### 3.1 Editor contract (LLM)
+Unchanged: a stable, cached system prompt (role, language rules, B1 rules, JSON schema, "never
+invent") and a volatile user message (profile context, date, weather facts, events, tasks,
+items[], vocab_due[], hobby topics, sport rule result). Output uses Anthropic structured outputs
+with the schema below; any `item_id`/`event_id`/`card_id` not present in the input is dropped.
+Model: `claude-opus-5-5` through AI Gateway (`https://gateway.ai.cloudflare.com/v1/<acct>/<gw>/anthropic`),
+`output_config.effort: "medium"`, `fallbacks: "default"`. Fallback chain: retry once → Workers AI
+(`@cf/meta/llama-3.3-70b-instruct-fp8-fast`, JSON mode) → no-LLM Brief (facts only).
+
 ```json
 {
   "headline": "string ≤ 60 chars",
@@ -133,66 +150,72 @@ Output schema (excerpt):
 }
 ```
 
-## 4. Data model (Postgres)
+## 4. Data model (D1 / SQLite)
 
 | Table | Key fields |
 |---|---|
-| `user` | id, email, locale (`en`/`de`), learner_level, timezone, city, lat/lon, wake_time, plan |
-| `profile` | user_id, context_md, hobbies[], sport_rules (json), countdowns (json: label+date) |
-| `source` | id, kind (`rss`/`telegram`/`gnews_query`/`ics`/`todoist`/`md_tasks`), config (json), shared (bool), last_fetch_at, last_error |
+| `user` | id, email, locale (`en`/`de`), learner_level, timezone, city, lat, lon, wake_time, plan, kindle_email, created_at |
+| `profile` | user_id, context_md, hobbies_json, sport_rules_json, countdowns_json |
+| `source` | id, kind (`rss`/`telegram`/`gnews_query`/`ics`/`todoist`/`md_tasks`), config_json (encrypted for private kinds), shared (0/1), etag, last_fetch_at, last_error |
 | `subscription` | user_id, source_id, rubric, weight |
-| `item` | id, source_id, external_id, url, title, body, published_at, fetched_at, hash |
-| `vocab_card` | id, user_id, de, en, example, fsrs_state (json), due_at, created_from_item_id |
+| `item` | id, source_id, external_id, url, title, body (≤ 2 kB), published_at, fetched_at, hash — unique (source_id, hash) |
+| `vocab_card` | id, user_id, de, en, example, fsrs_json, due_at, created_from_item_id |
 | `review` | card_id, reviewed_at, rating, mode (`paper`/`web`) |
-| `edition` | id, user_id, date, status, brief (jsonb), html_path, pdf_path, png_path, tokens_in/out, cost_cents, generated_at |
+| `edition` | id, user_id, date, status, brief_json, r2_prefix, tokens_in, tokens_out, cost_cents, browser_ms, generated_at — unique (user_id, date) |
 | `delivery` | edition_id, channel, target, status, error, sent_at |
-| `job` | db-scheduler table |
+| `session` | only if Cloudflare Access is not used; otherwise none |
 
-Secrets (ICS secret URLs, SMTP, Todoist tokens) are encrypted at rest with a server key
-(AES-GCM via Tink); never logged.
+Retention: items 7 days, editions 90 days (R2 objects deleted by a lifecycle rule), reviews forever.
+Write budget check for 100 users: 50 shared sources × 24 refreshes × ~5 new items = 6 k item
+rows + 100 editions + ~300 deliveries + reviews ≈ 7 k writes/day of the 100 k allowed.
 
 ## 5. Stack
 
 | Layer | Choice | Why |
 |---|---|---|
-| Language | **Kotlin on JVM 21** | Your primary language; a long-running public app with scheduling, auth, HTTP and HTML rendering is where the JVM is strong |
-| Framework | **Spring Boot 3.x** (WebMVC + Security + Thymeleaf) | OAuth2 client, scheduling, mail, actuator, config encryption come for free; Ktor is leaner but you would rebuild those |
-| DB | PostgreSQL 16, Flyway, Spring Data JDBC (or jOOQ) | jsonb for `brief`, simple mapping |
-| Scheduler | db-scheduler | Persistent, cluster-safe, one table |
-| HTTP clients | Spring `RestClient` | Timeouts, retries via Resilience4j |
-| RSS | Rome | Mature |
-| ICS | ical4j | Recurrence handling |
-| Telegram | jsoup on `t.me/s` | No credentials |
+| Runtime | **Cloudflare Workers**, TypeScript, `wrangler` | No JVM on Workers; TS is the first-class language with the best tooling |
+| HTTP framework | **Hono** | Tiny, typed, runs on Workers, has server-side JSX for templates |
+| Orchestration | **Workflows** (`EditionWorkflow`, `SourceRefreshWorkflow`) + 2 **Cron Triggers** | Durable steps with retries, each step gets its own 10 ms CPU budget |
+| Database | **D1** + `wrangler d1 migrations` | SQLite, enough quota, zero ops |
+| Objects | **R2** | Artifacts with free egress |
+| Rendering | **Browser Run** via `@cloudflare/puppeteer` binding | PDF and PNG in one session; locally use Playwright for template work |
+| Feeds | `fast-xml-parser` | Fast, small, no DOM |
+| ICS | `ical.js` or `node-ical` (nodejs_compat) | Recurrence expansion; cap at 60 days window to keep CPU low |
+| Telegram | `fetch` + `HTMLRewriter` (built into Workers, streaming, ~0 CPU) | Parse `t.me/s/<channel>` without loading a DOM |
 | Weather | Open-Meteo JSON | No key |
-| LLM | Anthropic Java SDK (`com.anthropic:anthropic-java`), `claude-opus-5-5`, structured outputs, `fallbacks: "default"` | One call per edition |
-| Spaced repetition | FsrsKt | FSRS-6 on JVM |
-| Templates | Thymeleaf + plain CSS (grid, `@page`) | Server-rendered; the same HTML is the web page and the print source |
-| Rendering | Playwright for Java (Chromium) | PDF + PNG from the same HTML |
-| Image | `com.sksamuel.scrimage` or AWT for 1-bit dithering | e-ink PNG |
-| Email | Spring Mail + any SMTP (Resend/Postmark/Gmail app password) | Kindle delivery |
-| Auth | Magic-link email (v1), Google sign-in later | No passwords to protect |
-| Frontend | Server-rendered HTML + htmx for the settings pages | No SPA; the product is a page, not an app |
-| Packaging | Docker (base `mcr.microsoft.com/playwright/java`), Compose with Postgres | One VM |
-| CI | GitHub Actions: build, tests, golden-render test, Docker push | |
+| LLM | **Anthropic TypeScript SDK** (`@anthropic-ai/sdk`) with `baseURL` set to **AI Gateway**; model `claude-opus-5-5`; structured outputs | Quality for selection and B1 German; gateway gives logs, caching, rate limits for free |
+| Free LLM fallback | **Workers AI** Llama 3.3 70B (JSON mode) | ~7 editions/day inside the 10 k neurons |
+| Spaced repetition | `ts-fsrs` (FSRS-6, TypeScript, used by many Anki-like apps) | Same algorithm as the earlier Kotlin choice |
+| Email (+Kindle) | **Resend** HTTP API, sending domain on Cloudflare DNS; PDF as attachment | Free tier ≈ 100/day; Cloudflare's own sending needs Workers Paid |
+| Auth | **Cloudflare Access** (one-time PIN / Google), Worker verifies the Access JWT | No auth code, no magic-link mail; up to 50 users free (*verify*), later a Lucia-style session table in D1 |
+| Frontend | Server-rendered HTML (Hono JSX) + htmx for settings | The product is a page, not an app |
+| Validation | `valibot` (or `typebox`) for Brief and settings | Small bundle, little CPU |
+| Tests | `vitest` + `@cloudflare/vitest-pool-workers`; golden render with local Playwright | Same runtime as production |
+| CI/CD | GitHub Actions: lint, test, `wrangler deploy` on `main`; `wrangler versions upload` for previews | |
+| Local dev | `wrangler dev` (local D1/R2), `wrangler dev --remote` for Browser Run and Workers AI | |
 
-Python stays for throwaway scripts (feed probing, one-off imports), per your preference.
+Python is reserved for one-off scripts (feed probing, vocabulary import conversion). Kotlin is
+not used in this project.
 
-Project layout (Gradle, single module to start, split later):
+Project layout (single Worker, split only if the bundle or routes grow):
 ```
 ranica/
-  build.gradle.kts
-  src/main/kotlin/ranica/
-    collect/   IcsCollector, RssCollector, TelegramCollector, WeatherCollector, TasksCollector
-    edit/      EditorService (LLM), BriefSchema, FallbackEditor
-    compose/   Composer, FitToPage
-    render/    ChromiumRenderer, Outputs (html/pdf/png/epub)
-    deliver/   WebDelivery, EmailDelivery, KindleDelivery, PrinterDelivery
-    learn/     VocabService (FSRS), ReviewController
-    web/       TodayController, EditionController, SettingsController
-    user/      User, Profile, Auth
-    jobs/      EditionJob, SourceRefreshJob
-  src/main/resources/templates/edition.html, settings/*.html
-  src/main/resources/static/css/newspaper.css, fonts/
+  wrangler.jsonc            bindings: D1, R2, BROWSER, AI, WORKFLOWS, crons, assets
+  package.json  tsconfig.json  vitest.config.ts
+  migrations/               D1 SQL migrations
+  src/
+    index.ts                Hono app + scheduled() handler
+    workflows/              EditionWorkflow.ts, SourceRefreshWorkflow.ts
+    collect/                ics.ts, rss.ts, telegram.ts, weather.ts, tasks.ts, gnews.ts
+    edit/                   editor.ts (Anthropic), brief.schema.ts, fallbackEditor.ts, workersAi.ts
+    compose/                compose.ts (Brief → HTML), blocks/*.tsx, priorities.ts
+    render/                 browser.ts (measure/trim/pdf/png in one session), kindle.ts
+    deliver/                email.ts (Resend), kindle.ts, webhook.ts
+    learn/                  fsrs.ts, review.ts
+    web/                    routes/today.tsx, editions.tsx, review.tsx, settings.tsx, auth.ts
+    db/                     queries.ts (typed), crypto.ts (AES-GCM for ICS URLs)
+  public/                   newspaper.css, fonts/*.woff2, htmx.min.js
+  tools/                    Python one-off scripts (probe_feed.py, anki_to_csv.py)
   docs/
 ```
 
@@ -201,73 +224,93 @@ ranica/
 Each milestone ends with something you can read in the morning.
 
 ### M0 — Look (2–3 days)
-- Static `edition.html` + `newspaper.css` with **fake data** for the full layout above, EN and DE.
-- Gradle project, Playwright renders it to A4 PDF and a 1-bit PNG.
+- `wrangler init` project with Hono; static `edition.html` + `newspaper.css` with **fake data**,
+  EN and DE; `/today` serves it.
+- Browser Run binding renders it to A4 PDF and PNG (`wrangler dev --remote`); local Playwright
+  script does the same for fast iteration.
 - Print it. Adjust type sizes until a two-column page is readable at 9–10 pt.
 - Done when: the printed page looks like the reference photo and you want to read it.
 
 ### M1 — My edition, single user (1–2 weeks)
-- Collectors: ICS (your Google secret URL), 3–5 RSS feeds, 2–3 Telegram channels, Open-Meteo,
-  `tasks.md`.
-- Editor with Claude, structured output, fallback editor.
-- Composer with fit-to-page.
-- Web: `/today`, `/editions/<date>`, archive list. Set `/today` as your browser home page.
-- Delivery: email with PDF → your Kindle address; daily job at 06:30 local.
-- Config from `application.yml` + env (no accounts yet).
+- D1 schema + migrations; your user row created by a seed script.
+- Collectors: ICS (Google secret URL), 3–5 RSS feeds, 2–3 Telegram channels, Open-Meteo,
+  `tasks.md` kept in R2 and edited via a tiny `/tasks` page.
+- **Day-1 check**: fetch `t.me/s/<channel>` and the feeds from a deployed Worker (Cloudflare egress
+  IPs) to confirm nothing blocks them; otherwise fall back to Browser Run `/markdown` for Telegram.
+- `EditionWorkflow` with one step per source; editor with Claude via AI Gateway; fallback editor.
+- Compose + fit-to-page in one browser session; artifacts to R2.
+- Web: `/today` (set as browser home page), `/editions/<date>`, archive list, behind Cloudflare
+  Access.
+- Delivery: Resend email with PDF → your Kindle address; cron scheduler at your wake time.
 - Done when: you read Ranica for 5 mornings in a row without touching the laptop.
 
 ### M2 — Learning and personal blocks (1 week)
-- Vocabulary: CSV/Anki import, FSRS scheduling, 5 due cards per day, paper-mode auto-"Good",
-  web grading page, "new word from today's news".
+- Vocabulary: CSV/Anki import (Python script → CSV → `/import`), `ts-fsrs` scheduling, 5 due cards
+  per day, paper-mode auto-"Good" at midnight, `/review` grading page, "new word from today's news".
 - Sport rules, countdowns, hobby rubric via Google News RSS queries, "on this day".
-- `de` mode with B1 writing rules; glossary in parentheses.
+- `de` mode with B1 writing rules and glosses.
 - Page-2 "long reads" option.
 - Done when: the German block feels like a real lesson, not decoration.
 
 ### M3 — Public (2–3 weeks)
-- Accounts (magic link), onboarding wizard (city → calendar link → pick sources → 5 lines of
-  context → delivery channel), source catalogue with search.
-- Per-user schedule and timezone, shared source cache, per-user LLM budget and cost tracking.
+- Onboarding wizard behind Access (city → calendar link → pick sources → 5 lines of context →
+  delivery channel), source catalogue with search, per-user timezone and wake time.
+- Shared source refresh, per-user LLM budget and cost tracking (tokens, browser ms per edition).
 - Settings pages, data export/delete, privacy page.
-- Rate limiting, abuse protection on collectors (allow-listed hosts, size caps).
-- Deploy on one VM with Compose; backups; uptime check.
+- Collector hardening: allow-listed hosts, response size caps, per-domain rate limits.
+- Quota dashboard: editions/day vs browser minutes, Resend mails/day, D1 writes/day; alert at 80 %.
 - Done when: a friend signs up and gets a page the next morning without your help.
 
 ### M4 — More outputs and sources (ongoing)
-- E-ink endpoint (`today.png` at device size), TRMNL plugin recipe, Kindle-dashboard mode.
-- IPP/CUPS printing for self-hosters, email-to-print, thermal ESC/POS.
+- E-ink endpoint (`/u/<token>/today.png` at device size), TRMNL plugin recipe, Kindle-dashboard mode.
+- Email-to-print, thermal ESC/POS raster, EPUB output.
 - Google Calendar OAuth, Todoist, Gmail "what needs an answer" (after Google verification).
-- MTProto sidecar for private Telegram channels (bring-your-own session).
+- Private Telegram channels via a user-run MTProto bridge posting into Ranica by webhook.
 - Comic/image slot via an image model, weekly "Sunday edition" with stats.
+- Move to Workers Paid ($5/mo) when daily editions approach ~80 or mails approach 100/day.
 
 ## 7. Testing strategy
-- Unit: collectors against recorded fixtures (WireMock), dedupe, FSRS scheduling, fit loop.
-- Contract: Editor output validated against schema and input IDs; a "golden Brief" fixture.
-- Golden render: render the golden Brief to PNG in CI and diff against a stored image
-  (small tolerance); catches layout regressions.
-- Daily smoke in prod: if an edition fails, the fallback editor runs and an alert email is sent.
+- Unit (vitest, Workers pool): collectors against recorded fixtures, dedupe, FSRS scheduling,
+  priority trimming, Brief validation against input ids.
+- CPU budget test: each collector parses its largest fixture under 5 ms in the Workers runtime
+  (half of the limit as safety margin).
+- Golden render: compose the golden Brief → HTML → local Playwright PNG; diff against a stored
+  image with a small tolerance.
+- Contract: Editor output validated against schema; one recorded real response as fixture.
+- Daily smoke in prod: if an edition fails, the fallback editor runs and an alert mail is sent;
+  Workflow instance ids logged for `wrangler workflows instances describe`.
 
 ## 8. Risks and mitigations
 
 | Risk | Mitigation |
 |---|---|
-| Telegram changes `t.me/s` markup | Isolate parser, fixture tests, alert on zero items; RSSHub or MTProto as fallback |
-| LLM invents or distorts news | Structured output, ID validation, 2-line cap, source tag on every item |
-| Page overflow / ugly breaks | Priority-based fit loop, golden render test, `break-inside: avoid` on blocks |
+| 10 ms CPU per step exceeded (big feed, slow parser) | One source per step, size cap 512 kB, `HTMLRewriter`/streaming parsers, CPU budget tests; Workers Paid raises it to 30 s if ever needed |
+| Browser minutes exhausted | One session per edition, measure first then one PDF+PNG; hard stop at 80 % of 10 min; HTML-only fallback delivery |
+| Cloudflare egress IPs blocked by t.me or a feed | Day-1 test; Browser Run `/markdown` fallback; RSSHub as last resort |
+| No outbound mail on Free | Resend (100/day); own addresses can also use Cloudflare's free "verified destination" sending |
+| LLM invents or distorts news | Structured output, id validation, 2-line cap, source tag on every item |
+| LLM cost for a public app | Per-user budget, Haiku 5.5 pre-filter, prompt caching, Workers AI fallback, AI Gateway rate limits |
+| Page overflow / ugly breaks | Priority-based trimming in the browser, golden render test, `break-inside: avoid` |
+| KV write cap | KV not used for state |
+| D1 write cap | Dedupe by hash, hourly refresh with ETag/If-Modified-Since, 7-day item retention |
 | Google OAuth verification pain | ICS secret URL first; OAuth only in M4 |
-| LLM cost for a public app | Haiku pre-filter, prompt caching, per-user budget, paid tier if needed |
-| Chromium memory on a small VM | One browser instance, page pool, render queue with concurrency 2 |
-| Open-Meteo non-commercial terms | Switch to a paid plan or Bright Sky/OpenWeather if Ranica charges |
+| Vendor lock-in | Collectors/editor/compose are plain TypeScript; only `src/workflows`, `render/browser.ts` and `db/` touch Cloudflare APIs |
 
 ## 9. Decisions still open (defaults chosen, change if you disagree)
-1. **Spring Boot vs Ktor** — default Spring Boot for batteries; Ktor if you want a smaller runtime.
-2. **Monorepo single module vs modules from day one** — single module until M3.
-3. **Kindle format** — device-sized PDF (keeps the newspaper look) by default; EPUB as an option.
-4. **Edition name on the masthead** — "Ranica" plus the user's own title (like "Утренний Мардан").
+1. **Auth** — Cloudflare Access by default (zero code); own magic links via Resend if Access's
+   free user cap or UX gets in the way.
+2. **LLM** — Claude Opus 5.5 via AI Gateway by default (≈ $4/month for one user); Workers AI
+   Llama for a fully free mode with lower German quality.
+3. **Kindle format** — device-sized PDF by default; EPUB later.
+4. **Edition name on the masthead** — "Ranica" plus the user's own title.
 5. **Second page** — off by default.
+6. **Single Worker vs several** — single Worker until M3.
 
 ## 10. First concrete steps
-1. Create the Gradle Kotlin project with Spring Boot, Playwright, Thymeleaf (M0 scaffolding).
-2. Write `edition.html` + `newspaper.css` from the layout in §2 with fake data in EN and DE.
-3. Add a `RenderSmokeTest` that renders the fake edition to PDF and PNG.
+1. `npm create cloudflare@latest ranica` (Hono template, TypeScript), add D1, R2, Browser Run and
+   Workflows bindings to `wrangler.jsonc`; deploy once to get the `workers.dev` URL.
+2. Write `newspaper.css` and the edition template as Hono JSX with fake data in EN and DE.
+3. Add `render/browser.ts` (one session: load → measure → trim → pdf → png) and a local Playwright
+   script for fast layout iteration.
 4. Print it and iterate on typography before any collector is written.
+5. From a deployed Worker, fetch `t.me/s/tagesschau` and the chosen feeds once to confirm access.

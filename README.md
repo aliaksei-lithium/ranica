@@ -10,6 +10,9 @@ Kindle or pushed to an e-ink display.
 
 Languages: English and German (German text can be written at a learner level, B1).
 
+Runs entirely on Cloudflare (Workers, Workflows, D1, R2, Browser Run) within the free tier;
+written in TypeScript.
+
 Status: **planning**. Nothing is implemented yet.
 
 - `docs/01-research.md` — prior art, data sources, delivery channels, rendering options, cost.

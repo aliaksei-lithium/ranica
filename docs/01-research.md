@@ -146,15 +146,18 @@ private channels.
 
 | Engine | Pros | Cons |
 |---|---|---|
-| **Chromium via Playwright** (Java `com.microsoft.playwright:playwright`, 1.52.0 on Maven Central) | Full modern CSS (grid, flex, `@page`, fonts), same HTML for web and print, also screenshots PNG for e-ink. `page.pdf()` takes format A4, margins, `printBackground`, `preferCSSPageSize`; PDF works in headless Chromium only | Needs a browser in the container (~400 MB); ready images exist (`mcr.microsoft.com/playwright/java`) |
+| **Chromium via Cloudflare Browser Run** (`@cloudflare/puppeteer` binding or REST `/pdf`, `/screenshot`) | Full modern CSS (grid, flex, `@page`, fonts), same HTML for web and print, PNG for e-ink; nothing to install; `page.pdf({format:'A4', printBackground:true, preferCSSPageSize:true})` | 10 browser-minutes/day on Free; one new browser per 20 s; keep one session per edition and do measure → trim → pdf → png inside it |
+| Chromium via Playwright (local) | Same engine, unlimited, good for template development and golden tests on a laptop/CI | Not available inside Workers |
 | WeasyPrint (Python) | No browser, good `@page` support | No flexbox/grid (morning-briefing had to use tables), Python only |
 | Typst | Beautiful typography | Separate markup; cannot reuse the web HTML |
 | Paged.js | CSS paged media polyfill | Still needs Chromium |
 
 Decision: **one HTML template, print CSS (`@page A4`, CSS grid, 2 columns), rendered by
-headless Chromium**. The web home page *is* the template; PDF and PNG are screenshots of it.
-Fit-to-page loop: render → ask the page its scroll height → if > 1 page, drop the lowest-priority
-blocks (order defined in the template) → re-render. Max 3 iterations.
+headless Chromium (Browser Run in production, Playwright locally)**. The web home page *is*
+the template; PDF and PNG are screenshots of it. Fit-to-page runs **inside one browser session**:
+load HTML → `page.evaluate` measures overflow and removes the lowest-priority blocks → `page.pdf`
+→ `page.screenshot`. 1-bit dithering for e-ink is done in the page with a canvas, so it costs
+browser time, not the Worker's 10 ms CPU.
 
 Typography: a classic serif for headlines (Playfair Display / Old Standard TT), a readable
 serif for body (PT Serif / Source Serif), a grotesque for numbers (Inter). All under OFL so the
@@ -171,13 +174,48 @@ fonts can be bundled. Monochrome by design: it prints on any printer and looks r
 | Email | HTML mail with PDF attached, via any SMTP / Resend / Postmark | Also the vehicle for Kindle |
 | Thermal receipt printer | ESC/POS raster from the PNG (58/80 mm) | Phase 4, dailytimes already solved it |
 
-## 6. Hosting options for a public app
+## 6. Hosting: Cloudflare free tier (decision)
 
-- **Single VM** (Hetzner CX22 ≈ €4/mo): Docker Compose with app + Postgres + Chromium in the app
-  image. Enough for hundreds of users (one edition = a few seconds of CPU).
-- GitHub Actions cron is enough for a *single-user* edition (prior art does this) but not for a
-  public app.
-- Keep LLM spend under control: per-user daily budget, shared source cache, Haiku pre-filter.
+Everything runs on one Cloudflare account on the Workers Free plan. Official limits, read from
+developers.cloudflare.com on 2026-11-03 (**verified live** unless marked):
+
+| Product | Free limit | What it means for Ranica |
+|---|---|---|
+| Workers | 100 000 requests/day; **10 ms CPU per request and per Cron Trigger**; 50 subrequests per request; 128 MB; 5 Cron Triggers per account | I/O wait is free, CPU is not. Parsing many feeds in one invocation will hit 10 ms. Split work into Workflow steps. |
+| Workflows | available on Free; **10 ms CPU per step**; 1 024 steps per instance; 100 MB state; 3-day retention; ~3 000 steps/day (*third-party figure*) | One Workflow instance per edition; one step per source/LLM/render/delivery gives each its own 10 ms budget plus retries. |
+| Queues | 10 000 operations/day on Free | Enough for delivery fan-out; Workflows already cover most of it. |
+| D1 (SQLite) | 5 M rows read/day; **100 000 rows written/day**; 5 GB | Main database. Dedupe items before insert; refresh shared sources at most hourly. |
+| KV | 100 000 reads/day; **1 000 writes/day**; 1 GB | Too few writes for sessions or caches. Use D1 and R2 instead. |
+| R2 | 10 GB; 1 M class A ops/month; 10 M class B ops/month; **free egress** | HTML/PDF/PNG artifacts, served through the Worker. |
+| Durable Objects | SQLite-backed only; 100 000 requests/day; 13 000 GB-s/day; 5 GB | Optional per-user alarm scheduler; not needed in v1. |
+| Browser Run (Browser Rendering) | **10 minutes of browser time/day**; 3 concurrent browsers; 1 new browser every 20 s; REST API 6 requests/min (*third-party figure*) | PDF + PNG rendering. One edition ≈ 5–8 s of browser time → roughly 80–100 editions/day on Free. |
+| Workers AI | 10 000 neurons/day | Free LLM fallback (Llama 3.x 70B ≈ 1 000–1 500 neurons per edition → ~7 editions/day). |
+| AI Gateway | core features free (analytics, caching, rate limiting) | Route Anthropic calls through it for logs and spend control. |
+| Email Service | **outbound sending not available on Free** (only to verified addresses in your own account); inbound routing unlimited | For your own Kindle/email you could verify your addresses and send free; for other users use Resend. |
+| Static assets | unlimited free requests | CSS, fonts, settings UI. |
+| Cloudflare Access (Zero Trust) | free up to 50 users, one-time PIN by email or Google login (*verify*) | Login without writing auth code or sending mail yourself. |
+
+Third-party email for arbitrary recipients: **Resend** free tier ≈ 3 000 emails/month, 100/day,
+HTTP API with attachments (*verify on resend.com/pricing*). A custom domain (~€10/year) is needed
+for a sending address that Amazon's approved-sender list can accept.
+
+Language: Workers run JavaScript/TypeScript (also Python via Pyodide, and WASM). There is no JVM,
+so the implementation language is **TypeScript**. Kotlin/JS can target Workers but the toolchain
+is immature; Python Workers have a limited package set and slower cold starts.
+
+Capacity on Free for a public app: the binding constraints are browser minutes (~100 editions/day)
+and Resend (100 mails/day). Above that, Workers Paid is $5/month and lifts most caps.
+Sources: [Workers limits](https://developers.cloudflare.com/workers/platform/limits/),
+[Workflows limits](https://developers.cloudflare.com/workflows/reference/limits/),
+[Queues pricing](https://developers.cloudflare.com/queues/platform/pricing/),
+[D1 pricing](https://developers.cloudflare.com/d1/platform/pricing/),
+[KV pricing](https://developers.cloudflare.com/kv/platform/pricing/),
+[R2 pricing](https://developers.cloudflare.com/r2/pricing/),
+[Browser Run limits](https://developers.cloudflare.com/browser-run/platform/limits/),
+[Workers AI pricing](https://developers.cloudflare.com/workers-ai/platform/pricing/),
+[Email Service pricing](https://developers.cloudflare.com/email-service/platform/pricing/),
+[AI Gateway pricing](https://developers.cloudflare.com/ai-gateway/reference/pricing/),
+[Durable Objects pricing](https://developers.cloudflare.com/durable-objects/platform/pricing/).
 
 ## 7. Legal / etiquette notes
 - RSS and `t.me/s` are public, but show the source and link; keep summaries short (2 lines),
