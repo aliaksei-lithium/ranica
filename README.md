@@ -60,6 +60,24 @@ One-time setup:
 4. Create a `main` branch from this one (and make it the default branch). The first push to `main`
    deploys; PR previews work after that first deploy, because they need the Worker to exist.
 
+From your machine (deploys the working tree as it is, no Git needed):
+
+```sh
+npm ci
+npx wrangler login          # once: opens the browser, stores an OAuth token
+npx wrangler whoami         # check the account
+npm run typecheck && npm test
+npm run deploy              # wrangler deploy: copies design/*.css to public/css, uploads
+```
+
+Without a browser (CI, SSH) use an API token instead of `login`:
+`CLOUDFLARE_API_TOKEN=… CLOUDFLARE_ACCOUNT_ID=… npm run deploy`.
+`npx wrangler deploy --dry-run --outdir dist` builds without uploading.
+
+Cloudflare Workers Builds (Git integration in the dashboard) works too: production branch `main`,
+build command `npm run typecheck && npm test`, deploy command `npx wrangler deploy`, Worker name
+`ranica`. Use either it or the Deploy workflow, not both.
+
 Without the secrets the deploy jobs skip with a notice, CI still runs. The deployed page is public and
 shows fake data; Cloudflare Access goes in front of it in M1 together with real data.
 
