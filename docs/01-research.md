@@ -1,7 +1,7 @@
 # 01 — Research
 
-Date: 2026-11-03. Sources are linked at the end of each section. Items marked *verify*
-could not be checked against the official page from this environment.
+Date: 2026-11-03. Sources are linked inline. Items marked **verified live** were called from
+this session on 2026-11-03; items marked *verify* come from third-party pages only.
 
 ## 1. The inspiration
 
@@ -59,9 +59,11 @@ print/Kindle/web outputs. That is the gap.
 ### 3.3 Weather
 - **Open-Meteo**: free for non-commercial use, no API key, ~10 000 requests/day fair use.
   Daily: `sunrise`, `sunset`, `daylight_duration`, `apparent_temperature_max/min`,
-  `precipitation_probability_max`, `wind_speed_10m_max`, `weather_code`. Hourly:
-  `temperature_2m`, `apparent_temperature`, `precipitation_probability`, `wind_speed_10m`.
-  One request per city per day. *verify exact variable names on open-meteo.com/en/docs.*
+  `precipitation_probability_max`, `wind_speed_10m_max`, `weather_code`, `uv_index_max`,
+  `sunshine_duration`. Hourly: `temperature_2m`, `apparent_temperature`,
+  `precipitation_probability`, `wind_speed_10m`, `weather_code`. One request per city per day.
+  **Verified live**: `GET api.open-meteo.com/v1/forecast?latitude=52.52&longitude=13.41&daily=…&timezone=Europe/Berlin`
+  returned all of the above; `daylight_duration` is in seconds (34 020 s = 9 h 27 min for Berlin today).
 - **Bright Sky** (DWD, Germany only): no key, hourly + MOSMIX forecasts; nice second source
   for users in Germany. ([brightsky.dev](https://brightsky.dev/))
 - The "feels colder than the numbers, take a hat" line is **rules + LLM**: rules decide the
@@ -69,11 +71,17 @@ print/Kindle/web outputs. That is the gap.
 
 ### 3.4 News from newspapers (RSS)
 - RSS is still the simplest reliable channel. Parse with `Rome` (JVM) or `feedparser` (Python).
-- Candidate German feeds: Tagesschau (`https://www.tagesschau.de/index~rss2.xml` and per
-  rubric `.../wirtschaft/index~rss2.xml`), Deutschlandfunk
-  (`https://www.deutschlandfunk.de/nachrichten-100.rss`), DW. *verify URLs.*
-- Candidate English feeds: BBC, Reuters via Google News RSS query
-  (`https://news.google.com/rss/search?q=<query>&hl=en`), Hacker News, The Verge, Heise (DE tech).
+- **Verified live** (HTTP 200, item count in brackets):
+  - Tagesschau `https://www.tagesschau.de/index~rss2.xml` [69], rubric pattern
+    `https://www.tagesschau.de/wirtschaft/index~rss2.xml` [19]
+  - Deutschlandfunk `https://www.deutschlandfunk.de/nachrichten-100.rss` [38]
+  - Deutsche Welle (German) `https://rss.dw.com/rdf/rss-de-all` [88]
+  - Heise `https://www.heise.de/rss/heise-atom.xml` [157] (Atom)
+  - BBC World `https://feeds.bbci.co.uk/news/world/rss.xml` [23]
+  - Google News query `https://news.google.com/rss/search?q=<query>&hl=en-US&gl=US&ceid=US:en`
+    (returns a feed; results depend on the query)
+- Also candidates: Hacker News, The Verge, DW "Langsam gesprochene Nachrichten" (podcast feed,
+  good for the German block), Nachrichtenleicht (DLF, easy German).
 - Google News RSS search gives "news about <topic>" for hobby rubrics with zero scraping.
 - Fetch **once per source per interval, shared by all users** (a feed is not per-user data).
 - De-duplicate by canonical URL and by normalized title (same story from several outlets).
@@ -88,13 +96,18 @@ Three ways to read a *public* channel ([comparison](https://dev.to/starnikovoleg
 | **MTProto** (Telethon/TDLib) with a user session | api_id/hash + phone, session file | Full history, private channels you are in, reactions | Session file = your account; ban risk if abused |
 | Bot API | bot must be channel admin | official | Useless for channels you don't own |
 
+**Verified live**: `curl https://t.me/s/tagesschau` returned 93 KB of HTML with 20 posts; each
+post has `data-post="<channel>/<id>"`, `.tgme_widget_message_text` and `<time datetime=…>`,
+so parsing needs ~20 lines of jsoup. Latest post was 3 hours old at fetch time.
+
 Decision: **v1 = t.me/s scraping with jsoup**, cached per channel (not per user), polite rate
 (1 req / channel / 15 min). MTProto later as an optional "bring your own session" sidecar for
 private channels.
 
 ### 3.6 German words (spaced repetition)
-- **FSRS-6** is the current open algorithm (used by Anki). JVM: [FsrsKt](https://klibs.io/project/TheRockYT/FsrsKt)
-  on Maven Central (Kotlin Multiplatform). Python: `py-fsrs`.
+- **FSRS-6** is the current open algorithm (used by Anki). JVM: [FsrsKt](https://github.com/TheRockYT/FsrsKt)
+  (Kotlin Multiplatform, Maven Central `one.felsen.fsrskt:fsrskt`, README verified live).
+  Python: `py-fsrs`.
   ([open-spaced-repetition](https://github.com/open-spaced-repetition))
 - Paper has no "Again/Good" buttons. Two modes:
   1. *Paper mode*: a card printed today is treated as reviewed "Good" unless the user marks it
@@ -133,7 +146,7 @@ private channels.
 
 | Engine | Pros | Cons |
 |---|---|---|
-| **Chromium via Playwright** (Java, Python, Node) | Full modern CSS (grid, flex, `@page`, fonts), same HTML for web and print, also screenshots PNG for e-ink | Needs a browser in the container (~400 MB); ready images exist (`mcr.microsoft.com/playwright/java`) |
+| **Chromium via Playwright** (Java `com.microsoft.playwright:playwright`, 1.52.0 on Maven Central) | Full modern CSS (grid, flex, `@page`, fonts), same HTML for web and print, also screenshots PNG for e-ink. `page.pdf()` takes format A4, margins, `printBackground`, `preferCSSPageSize`; PDF works in headless Chromium only | Needs a browser in the container (~400 MB); ready images exist (`mcr.microsoft.com/playwright/java`) |
 | WeasyPrint (Python) | No browser, good `@page` support | No flexbox/grid (morning-briefing had to use tables), Python only |
 | Typst | Beautiful typography | Separate markup; cannot reuse the web HTML |
 | Paged.js | CSS paged media polyfill | Still needs Chromium |
@@ -153,7 +166,7 @@ fonts can be bundled. Monochrome by design: it prints on any printer and looks r
 |---|---|---|
 | Browser home page | `GET /today` → 302 to latest edition HTML; `GET /u/<token>/today` for unauthenticated kiosk/e-ink use | Auto-refresh meta tag; archive under `/editions/YYYY-MM-DD` |
 | Print | user downloads PDF; or server sends to printer via IPP/CUPS (`lp`) when self-hosted; or email-to-print (HP/Brother/Epson have email printers) | IPP from the cloud is hard; email-to-print is the portable path |
-| Kindle | Send-to-Kindle **email** with a PDF attachment, from an approved sender address. Kindle Scribe/Paperwhite: a PDF sized to the screen (e.g. 6.8" ≈ 1236×1648 px) looks like a real page; for reflow use EPUB. Formats: PDF, EPUB, DOCX, HTML…; limit 25 files / 50 MB per mail. *verify on Amazon's Send to Kindle page* | Alternative: jailbroken Kindle as a dashboard (TRMNL guide) polling the PNG URL |
+| Kindle | Send-to-Kindle **email** with a PDF attachment. **Verified live on amazon.com/sendtokindle/email**: supported types PDF, DOC, DOCX, TXT, RTF, HTM, HTML, PNG, GIF, JPG, JPEG, BMP, EPUB; only *approved* sender addresses are accepted; no subject line needed. Limit of 25 files / 50 MB per mail is from third-party pages (*verify*). Kindle Scribe/Paperwhite: a PDF sized to the screen (e.g. 6.8" ≈ 1236×1648 px) keeps the newspaper look; for reflow send EPUB. | Alternative: jailbroken Kindle as a dashboard (TRMNL guide) polling the PNG URL |
 | E-ink (TRMNL, Inkplate, Kindle-dash) | `GET /u/<token>/today.png` 1-bit PNG at the device resolution | Free by-product of Chromium screenshots |
 | Email | HTML mail with PDF attached, via any SMTP / Resend / Postmark | Also the vehicle for Kindle |
 | Thermal receipt printer | ESC/POS raster from the PNG (58/80 mm) | Phase 4, dailytimes already solved it |
