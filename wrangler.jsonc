@@ -1,0 +1,26 @@
+{
+  // Ranica — single Worker (see docs/02-plan.md §3).
+  // M0: only static assets + the Hono app with fake data. Other bindings are listed
+  // as comments and get enabled in M1 when the real pipeline is built.
+  "$schema": "node_modules/wrangler/config-schema.json",
+  "name": "ranica",
+  "main": "src/index.ts",
+  "compatibility_date": "2026-10-01",
+  "compatibility_flags": ["nodejs_compat"],
+  "assets": {
+    "directory": "./public",
+    "binding": "ASSETS"
+  },
+  "observability": { "enabled": true }
+
+  // M1:
+  // "d1_databases": [{ "binding": "DB", "database_name": "ranica", "database_id": "<id>" }],
+  // "r2_buckets": [{ "binding": "EDITIONS", "bucket_name": "ranica-editions" }],
+  // "browser": { "binding": "BROWSER" },
+  // "ai": { "binding": "AI" },
+  // "workflows": [
+  //   { "name": "edition", "binding": "EDITION_WORKFLOW", "class_name": "EditionWorkflow" },
+  //   { "name": "source-refresh", "binding": "SOURCE_REFRESH", "class_name": "SourceRefreshWorkflow" }
+  // ],
+  // "triggers": { "crons": ["*/15 * * * *", "0 * * * *"] }
+}

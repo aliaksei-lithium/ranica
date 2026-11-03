@@ -1,0 +1,755 @@
+/*
+ * Ranica — newspaper page. Monochrome, three families, rules instead of boxes.
+ * Sizes are in pt (type) and mm (spacing) so the print page is the reference;
+ * the browser view shows the same sheet, Kindle scales it with `zoom`.
+ *
+ * Style sheet (design brief §6.7):
+ *   masthead date   Playfair Display 900, 76pt / 0.8
+ *   masthead month  Playfair Display 700, 25pt
+ *   edition name    Playfair Display 900, 28pt
+ *   section label   IBM Plex Sans 600, 7.5pt caps, +0.14em, 1.5pt rule above
+ *   rubric          Playfair Display 700 italic, 11pt
+ *   item title      PT Serif 700, 9.5pt / 1.2
+ *   body            PT Serif 400, 9.5pt / 1.32
+ *   grey note       PT Serif italic, 8.2pt, #555 (reads as black when flattened)
+ *   source tag      IBM Plex Sans 500, 7pt caps
+ *   numbers/labels  IBM Plex Sans, tabular figures
+ *   footer          IBM Plex Sans 400, 7.5pt
+ *   rules           2pt (masthead), 1.5pt (labels, insight), 0.75pt (sun line, footer),
+ *                   0.5pt (column rule, minimum) — never thinner than 0.3pt
+ *   spacing scale   1, 2, 3, 5, 8 mm
+ */
+
+:root {
+  --f-head: 'Playfair Display', 'Old Standard TT', Georgia, serif;
+  --f-body: 'PT Serif', 'Source Serif 4', Georgia, serif;
+  --f-sans: 'IBM Plex Sans', 'Inter', Arial, sans-serif;
+  --ink: #000;
+  --grey: #555;
+  --paper: #fff;
+  --desk: #e4e3df;
+  --s1: 1mm;
+  --s2: 2mm;
+  --s3: 3mm;
+  --s5: 5mm;
+  --s8: 8mm;
+  --rule-heavy: 2pt;
+  --rule: 1.5pt;
+  --rule-mid: 0.75pt;
+  --rule-thin: 0.5pt;
+}
+
+@page {
+  size: A4;
+  margin: 12mm;
+}
+
+@page kindle {
+  size: 1236px 1648px;
+  margin: 0;
+}
+
+*,
+*::before,
+*::after {
+  box-sizing: border-box;
+}
+
+html {
+  -webkit-print-color-adjust: exact;
+  print-color-adjust: exact;
+}
+
+body {
+  margin: 0;
+  background: var(--paper);
+  color: var(--ink);
+  font: 400 9.5pt/1.32 var(--f-body);
+  font-kerning: normal;
+  text-rendering: optimizeLegibility;
+}
+
+p,
+h1,
+h2,
+h3,
+h4,
+ul,
+ol,
+blockquote {
+  margin: 0;
+  padding: 0;
+}
+
+ul,
+ol {
+  list-style: none;
+}
+
+a {
+  color: inherit;
+  text-decoration: none;
+}
+
+/* Long German compounds: hyphenate where the browser can, break as a last resort. */
+.sheet {
+  hyphens: auto;
+  overflow-wrap: break-word;
+}
+
+/* ─── The sheet ───────────────────────────────────────────────────────────── */
+
+.sheet {
+  background: var(--paper);
+  display: flex;
+  flex-direction: column;
+}
+
+.columns {
+  display: grid;
+  grid-template-columns: 62fr 38fr;
+  margin-top: var(--s3);
+}
+
+.col-main {
+  padding-right: var(--s5);
+}
+
+.col-side {
+  padding-left: var(--s5);
+  border-left: var(--rule-thin) solid var(--ink);
+}
+
+/* ─── A · Masthead ────────────────────────────────────────────────────────── */
+
+.masthead {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-end;
+  gap: var(--s5);
+  padding-bottom: var(--s2);
+  border-bottom: var(--rule-heavy) solid var(--ink);
+}
+
+.mast-date {
+  display: flex;
+  align-items: flex-end;
+  gap: var(--s3);
+}
+
+.mast-day {
+  font: 900 76pt/0.8 var(--f-head);
+  letter-spacing: -0.02em;
+  font-variant-numeric: lining-nums;
+}
+
+.mast-month-wrap {
+  display: flex;
+  flex-direction: column;
+  padding-bottom: 1pt;
+}
+
+.mast-month {
+  font: 700 25pt/1 var(--f-head);
+}
+
+.mast-weekday,
+.mast-meta,
+.mast-issue {
+  font: 500 7.5pt/1.3 var(--f-sans);
+  text-transform: uppercase;
+  letter-spacing: 0.14em;
+}
+
+.mast-weekday {
+  margin-top: var(--s1);
+}
+
+.mast-title {
+  text-align: right;
+}
+
+.mast-name {
+  font: 900 28pt/1 var(--f-head);
+  letter-spacing: 0.01em;
+}
+
+.mast-issue {
+  font-size: 7.5pt;
+  vertical-align: 0.6em;
+}
+
+.mast-reader {
+  font: italic 400 12pt/1.25 var(--f-head);
+}
+
+.mast-meta {
+  margin-top: 1pt;
+  font-size: 7pt;
+}
+
+/* ─── B · Sun line ────────────────────────────────────────────────────────── */
+
+.sunline {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  padding: var(--s1) 0 1.2mm;
+  border-bottom: var(--rule-mid) solid var(--ink);
+  font: 400 8pt/1.3 var(--f-sans);
+  font-variant-numeric: tabular-nums;
+}
+
+.sunline > span {
+  white-space: pre;
+}
+
+.sun-times {
+  font-weight: 600;
+}
+
+.sunline .sep {
+  color: var(--grey);
+}
+
+.motto {
+  margin-left: auto;
+  font: italic 400 8.5pt/1.3 var(--f-head);
+}
+
+.glyph {
+  display: inline-block;
+}
+
+.glyph-inline {
+  width: 1.15em;
+  height: 1.15em;
+  vertical-align: -0.2em;
+}
+
+/* ─── Shared block anatomy ────────────────────────────────────────────────── */
+
+.block {
+  margin-bottom: var(--s5);
+  break-inside: avoid;
+}
+
+.label {
+  padding-top: 1.2mm;
+  margin-bottom: var(--s2);
+  border-top: var(--rule) solid var(--ink);
+  font: 600 7.5pt/1 var(--f-sans);
+  text-transform: uppercase;
+  letter-spacing: 0.14em;
+}
+
+.note {
+  display: block;
+  color: var(--grey);
+  font: italic 400 8.2pt/1.25 var(--f-body);
+}
+
+.source {
+  white-space: nowrap;
+  font: 500 7pt/1 var(--f-sans);
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+}
+
+.source::before {
+  content: '— ';
+}
+
+.empty {
+  font-style: italic;
+}
+
+/* The one-line "unavailable" note that replaces a failed block. */
+.unavailable {
+  padding: 1.2mm var(--s2);
+  border: var(--rule-thin) dashed var(--ink);
+  font: 400 8pt/1.3 var(--f-sans);
+}
+
+.unavailable-mark {
+  font-weight: 600;
+}
+
+/* ─── C · Weather ─────────────────────────────────────────────────────────── */
+
+.weather {
+  display: grid;
+  grid-template-columns: auto 1fr;
+  gap: var(--s3);
+  align-items: start;
+}
+
+.weather-temp {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--s1);
+  font: 700 46pt/0.85 var(--f-head);
+  font-variant-numeric: lining-nums;
+}
+
+.weather-glyph {
+  width: 9mm;
+  height: 9mm;
+  margin-top: 1mm;
+}
+
+.weather-text {
+  padding-top: 1pt;
+}
+
+.advice {
+  margin-top: var(--s1);
+  padding-left: var(--s2);
+  border-left: 2.5pt solid var(--ink);
+  font-weight: 700;
+}
+
+/* ─── D · Today ───────────────────────────────────────────────────────────── */
+
+.agenda li,
+.tasks li {
+  display: grid;
+  gap: var(--s2);
+  break-inside: avoid;
+}
+
+.agenda li {
+  grid-template-columns: 11mm 1fr;
+  padding: 0.8mm 0;
+}
+
+.agenda li + li {
+  border-top: var(--rule-thin) dotted var(--ink);
+}
+
+.time {
+  font: 600 9pt/1.4 var(--f-sans);
+  font-variant-numeric: tabular-nums;
+}
+
+.detail {
+  font-size: 8.8pt;
+}
+
+.tasks {
+  margin-top: var(--s2);
+}
+
+.tasks li {
+  grid-template-columns: 3.4mm 1fr;
+  padding: 0.6mm 0;
+}
+
+.box {
+  width: 3.4mm;
+  height: 3.4mm;
+  margin-top: 0.6mm;
+  border: 0.9pt solid var(--ink);
+}
+
+/* ─── E · Sport, I · Hobby, J · Quote ─────────────────────────────────────── */
+
+.quote {
+  font: italic 400 10pt/1.3 var(--f-head);
+}
+
+.quote-author {
+  font: 500 7pt/1 var(--f-sans);
+  font-style: normal;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+}
+
+/* ─── F · German today: a small lesson box between double rules ───────────── */
+
+.lesson {
+  padding: var(--s2) 0 var(--s2);
+  border-top: 3pt double var(--ink);
+  border-bottom: 3pt double var(--ink);
+}
+
+.lesson .label {
+  border-top: 0;
+  padding-top: 0;
+}
+
+.cards {
+  counter-reset: card;
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  column-gap: var(--s5);
+  row-gap: 1.6mm;
+}
+
+.cards li {
+  counter-increment: card;
+  position: relative;
+  padding-left: 4mm;
+  break-inside: avoid;
+}
+
+.cards li::before {
+  content: counter(card);
+  position: absolute;
+  left: 0;
+  top: 0.15em;
+  font: 600 7pt/1.3 var(--f-sans);
+}
+
+.word {
+  font-weight: 700;
+}
+
+.gloss {
+  font-style: italic;
+}
+
+.example {
+  display: block;
+  font-size: 8.6pt;
+  line-height: 1.25;
+}
+
+.new-word {
+  margin-top: var(--s2);
+  padding-top: 1.2mm;
+  border-top: var(--rule-thin) solid var(--ink);
+}
+
+.new-word-label {
+  font: 600 7pt/1 var(--f-sans);
+  text-transform: uppercase;
+  letter-spacing: 0.1em;
+}
+
+/* ─── G · News ────────────────────────────────────────────────────────────── */
+
+.rubric + .rubric {
+  margin-top: var(--s3);
+}
+
+.rubric-name {
+  margin-bottom: var(--s1);
+  font: italic 700 11pt/1.1 var(--f-head);
+}
+
+.item {
+  break-inside: avoid;
+}
+
+.item + .item {
+  margin-top: 1.6mm;
+}
+
+.item-title {
+  font: 700 9.5pt/1.2 var(--f-body);
+}
+
+.item-summary {
+  font-size: 8.8pt;
+  line-height: 1.28;
+}
+
+.tg .source::before {
+  content: '';
+}
+
+/* ─── H · Insight of the day: the strongest box after the masthead ────────── */
+
+.block-insight {
+  padding: var(--s3) 3.5mm 3.5mm;
+  border: var(--rule) solid var(--ink);
+}
+
+.block-insight .label {
+  border-top: 0;
+  padding-top: 0;
+}
+
+.insight-head {
+  margin-bottom: var(--s1);
+  font: italic 700 14pt/1.1 var(--f-head);
+  hyphens: manual;
+}
+
+.insight-text {
+  font-size: 9.8pt;
+  line-height: 1.38;
+}
+
+/* ─── L · Footer ──────────────────────────────────────────────────────────── */
+
+.footer {
+  display: flex;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: var(--s1) var(--s5);
+  padding-top: 1.2mm;
+  border-top: var(--rule-mid) solid var(--ink);
+  font: 400 7.5pt/1.3 var(--f-sans);
+  font-variant-numeric: tabular-nums;
+}
+
+.footer b {
+  font-weight: 600;
+}
+
+/* ─── Views ───────────────────────────────────────────────────────────────── */
+
+/* web: the sheet centred on grey like paper on a desk */
+.view-web,
+.view-print {
+  background: var(--desk);
+}
+
+.view-web .sheet,
+.view-print .sheet {
+  width: 210mm;
+  margin: 8mm auto;
+  padding: 12mm;
+}
+
+.view-web .sheet {
+  min-height: 297mm;
+}
+
+.view-web .footer {
+  margin-top: auto;
+}
+
+/* print: an exact A4 sheet; the columns clip so fit.js can measure overflow */
+.view-print .sheet {
+  height: 297mm;
+}
+
+.view-print .columns {
+  flex: 1;
+  min-height: 0;
+}
+
+.view-print .col {
+  overflow: hidden;
+}
+
+/* phone: stack the columns (nice-to-have in the brief) */
+@media screen and (max-width: 760px) {
+  .view-web .sheet {
+    width: auto;
+    min-height: 0;
+    margin: 0;
+    padding: 16px;
+  }
+
+  .view-web .columns {
+    grid-template-columns: 1fr;
+  }
+
+  .view-web .col-main {
+    padding-right: 0;
+  }
+
+  .view-web .col-side {
+    padding-left: 0;
+    border-left: 0;
+  }
+
+  .view-web .masthead {
+    flex-direction: column;
+    align-items: flex-start;
+  }
+
+  .view-web .mast-title {
+    text-align: left;
+  }
+
+  .view-web .mast-day {
+    font-size: 60pt;
+  }
+
+  .view-web .motto {
+    margin-left: 0;
+    width: 100%;
+  }
+
+  .view-web .cards {
+    grid-template-columns: 1fr;
+  }
+}
+
+@media print {
+  .view-web,
+  .view-print {
+    background: none;
+  }
+
+  .view-web .sheet,
+  .view-print .sheet {
+    width: auto;
+    min-height: 0;
+    margin: 0;
+    padding: 0;
+  }
+
+  .view-print .sheet {
+    height: 273mm; /* 297 − 2 × 12 mm margins */
+  }
+}
+
+/* kindle: 1236 × 1648 px pages, one column, everything scaled up */
+.view-kindle .sheet {
+  page: kindle;
+  zoom: 1.5;
+  width: calc(1236px / 1.5);
+  padding: 32px 40px;
+}
+
+.view-kindle .columns {
+  grid-template-columns: 1fr;
+}
+
+.view-kindle .col-main {
+  padding-right: 0;
+}
+
+.view-kindle .col-side {
+  padding-left: 0;
+  border-left: 0;
+}
+
+.view-kindle .footer {
+  margin-top: var(--s3);
+}
+
+/* ─── Archive list ────────────────────────────────────────────────────────── */
+
+.sheet-archive {
+  min-height: 0 !important;
+}
+
+.archive-title {
+  padding-bottom: var(--s2);
+  border-bottom: var(--rule-heavy) solid var(--ink);
+  font: 900 28pt/1 var(--f-head);
+}
+
+.archive li {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  padding: var(--s2) 0;
+  border-bottom: var(--rule-thin) solid var(--ink);
+  font-size: 11pt;
+}
+
+.archive-day {
+  font: 900 18pt/1 var(--f-head);
+}
+
+/* ─── E-ink widget: 800 × 480, 1-bit — black on white only, no greys ──────── */
+
+.view-eink {
+  width: 800px;
+  height: 480px;
+  overflow: hidden;
+}
+
+.eink {
+  display: grid;
+  grid-template-columns: 320px 1fr;
+  width: 800px;
+  height: 480px;
+  padding: 24px;
+  gap: 24px;
+  color: #000;
+  background: #fff;
+}
+
+.eink-left {
+  border-right: 3px solid #000;
+  padding-right: 20px;
+}
+
+.eink-day {
+  font: 900 150px/0.82 var(--f-head);
+  letter-spacing: -0.02em;
+  font-variant-numeric: lining-nums;
+}
+
+.eink-month {
+  margin-top: 12px;
+  font: 700 36px/1 var(--f-head);
+}
+
+.eink-weekday {
+  margin-top: 6px;
+  font: 600 16px/1 var(--f-sans);
+  text-transform: uppercase;
+  letter-spacing: 0.14em;
+}
+
+.eink-sun {
+  margin-top: 16px;
+  padding-top: 10px;
+  border-top: 3px solid #000;
+  font: 600 20px/1 var(--f-sans);
+  font-variant-numeric: tabular-nums;
+}
+
+.eink-weather {
+  margin-top: 14px;
+}
+
+.eink-temp {
+  display: block;
+  font: 700 64px/0.9 var(--f-head);
+  font-variant-numeric: lining-nums;
+}
+
+.eink-note {
+  display: block;
+  margin-top: 6px;
+  font: 700 18px/1.2 var(--f-body);
+}
+
+.eink-label {
+  margin-bottom: 8px;
+  padding-top: 6px;
+  border-top: 3px solid #000;
+  font: 600 15px/1 var(--f-sans);
+  text-transform: uppercase;
+  letter-spacing: 0.14em;
+}
+
+.eink-label + .eink-row {
+  margin-top: 0;
+}
+
+.eink-row {
+  font: 400 21px/1.25 var(--f-body);
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+
+.eink-row .time {
+  font: 600 20px/1.25 var(--f-sans);
+}
+
+.eink-row + .eink-label {
+  margin-top: 16px;
+}
+
+.eink-headline {
+  margin-bottom: 6px;
+  font-weight: 700;
+  font-size: 19px;
+  white-space: normal;
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+}
