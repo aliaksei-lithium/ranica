@@ -17,3 +17,4 @@ Status: **planning**. Nothing is implemented yet.
 
 - `docs/01-research.md` — prior art, data sources, delivery channels, rendering options, cost.
 - `docs/02-plan.md` — product definition, page layout, architecture, data model, stack, roadmap.
+- `docs/03-design-brief.md` — self-contained brief for the page design (print, web, Kindle, e-ink).
