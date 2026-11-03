@@ -1,0 +1,42 @@
+/* Ranica — generated from tokens.json (design/build). */
+:root {
+  --paper: #ffffff;
+  --desk: #e4e4e4;
+  --ink: #000000;
+  --ink-muted: #595959;
+  --rule: #000000;
+  --rule-light: #8c8c8c;
+  --font-display: "Playfair Display", "Old Standard TT", Georgia, serif;
+  --font-serif: "PT Serif", "Source Serif 4", Georgia, serif;
+  --font-sans: "IBM Plex Sans", "Inter", system-ui, sans-serif;
+  --space-1: 4px;
+  --space-2: 8px;
+  --space-3: 11px;
+  --space-4: 15px;
+  --space-5: 19px;
+  --space-6: 23px;
+  --space-12: 45px;
+  --radius-0: 0px;
+  --rule-hair: 0.5pt;
+  --rule-thin: 0.75pt;
+  --rule-medium: 1.5pt;
+  --rule-heavy: 3pt;
+  --page-width: 210mm;
+  --page-height: 297mm;
+  --page-margin: 12mm;
+  --column-gutter: 5mm;
+  --column-split: 62fr 38fr;
+  --checkbox-size: 3mm;
+  --qr-size: 12mm;
+  --comic-panel: 55mm;
+  --kindle-page: 1236px 1648px;
+  --eink-widget: 800px 480px;
+}
+[data-theme="eink"] {
+  --paper: #ffffff;
+  --desk: #ffffff;
+  --ink: #000000;
+  --ink-muted: #000000;
+  --rule: #000000;
+  --rule-light: #000000;
+}
