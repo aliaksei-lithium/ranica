@@ -1,6 +1,6 @@
 // Local render loop for template work (docs/02-plan.md §6, M0).
 // Start the dev server first (`npm run dev`), then: `npm run render [-- --base http://127.0.0.1:8787]`.
-// Writes A4 PDFs + PNGs, browser/phone views, Kindle PDF/PNG and the e-ink PNG into out/.
+// Writes A4 PDFs (front + back) + one PNG per sheet, browser/phone views, Kindle PDF/PNG and the e-ink PNG into out/.
 // Browser Run (src/render/browser.ts, M1) will do the same steps in one session in production.
 import { mkdirSync } from 'node:fs';
 import { createRequire } from 'node:module';
@@ -28,8 +28,8 @@ const jobs = [
   { name: 'phone', path: '/today?lang=en', kind: 'phone' },
   { name: 'kindle', path: '/today?view=kindle&lang=en', kind: 'kindle' },
   { name: 'kindle-de', path: '/today?view=kindle&lang=de', kind: 'kindle' },
-  { name: 'eink', path: '/today.eink?lang=en', kind: 'eink' },
-  { name: 'eink-de', path: '/today.eink?lang=de', kind: 'eink' },
+  { name: 'eink', path: '/today?view=eink&lang=en', kind: 'eink' },
+  { name: 'eink-de', path: '/today?view=eink&lang=de', kind: 'eink' },
 ];
 
 const browser = await chromium.launch();
@@ -50,8 +50,12 @@ try {
       await page.waitForFunction(() => document.body.dataset.fitDone);
       const { fitDone, trimmed } = await page.evaluate(() => ({ ...document.body.dataset }));
       await page.pdf({ path: `${OUT}/${job.name}.pdf`, preferCSSPageSize: true, printBackground: true });
-      await page.locator('.sheet').screenshot({ path: `${OUT}/${job.name}.png` });
-      console.log(`${job.name}: fit=${fitDone}${trimmed ? ` trimmed=${trimmed}` : ''}`);
+      const sheets = page.locator('.sheet');
+      const n = await sheets.count();
+      for (let i = 0; i < n; i++) {
+        await sheets.nth(i).screenshot({ path: `${OUT}/${job.name}${i ? `-p${i + 1}` : ''}.png` });
+      }
+      console.log(`${job.name}: ${n} sheet(s), fit=${fitDone}${trimmed ? ` trimmed=${trimmed}` : ''}`);
     } else if (job.kind === 'kindle') {
       await page.emulateMedia({ media: 'print' });
       await page.pdf({ path: `${OUT}/${job.name}.pdf`, preferCSSPageSize: true, printBackground: true });
@@ -59,7 +63,8 @@ try {
       await page.screenshot({ path: `${OUT}/${job.name}.png` });
       console.log(`${job.name}: pdf + png`);
     } else {
-      await page.screenshot({ path: `${OUT}/${job.name}.png`, fullPage: job.kind !== 'eink' });
+      const target = job.kind === 'eink' ? page.locator('.widget') : page;
+      await target.screenshot({ path: `${OUT}/${job.name}.png`, ...(job.kind === 'eink' ? {} : { fullPage: true }) });
       console.log(`${job.name}: png`);
     }
     await ctx.close();

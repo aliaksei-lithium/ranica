@@ -5,7 +5,7 @@ import { readFileSync, writeFileSync, copyFileSync, mkdirSync, readdirSync, rmSy
 import { join } from 'node:path';
 
 const FONTS = [
-  { pkg: 'playfair-display', files: ['400.css', '400-italic.css', '700.css', '900.css'] },
+  { pkg: 'playfair-display', files: ['700.css', '900.css'] },
   { pkg: 'pt-serif', files: ['400.css', '400-italic.css', '700.css', '700-italic.css'] },
   { pkg: 'ibm-plex-sans', files: ['400.css', '500.css', '600.css'] },
 ];

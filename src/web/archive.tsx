@@ -1,39 +1,37 @@
 import type { FC } from 'hono/jsx';
 import type { Lang } from '../model';
+import { Doc } from '../compose/compose';
 import { dateParts, t } from '../compose/i18n';
 
 export const ArchivePage: FC<{ lang: Lang; list: { date: string; issue: number }[] }> = ({ lang, list }) => {
   const L = t(lang);
   return (
-    <html lang={lang}>
-      <head>
-        <meta charset="utf-8" />
-        <meta name="viewport" content="width=device-width, initial-scale=1" />
-        <title>Ranica · {L.archive}</title>
-        <link rel="stylesheet" href="/fonts/fonts.css" />
-        <link rel="stylesheet" href="/newspaper.css" />
-      </head>
-      <body class="view-web">
-        <main class="sheet sheet-archive">
-          <h1 class="archive-title">Ranica · {L.archive}</h1>
-          <ul class="archive">
+    <Doc lang={lang} title={`Ranica · ${L.archive}`} bodyClass="view-web">
+      <div class="desk">
+        <article class="sheet sheet--archive" lang={lang}>
+          <header class="masthead masthead--page2">
+            <div class="masthead__date">
+              <span class="masthead__month">{L.archive}</span>
+            </div>
+            <div class="masthead__edition">
+              <span class="masthead__wordmark">Ranica</span>
+            </div>
+          </header>
+          <div class="agenda agenda--archive">
             {list.map(({ date, issue }) => {
               const d = dateParts(date, lang);
               return (
-                <li>
-                  <a href={`/editions/${date}?lang=${lang}`}>
-                    <span class="archive-day">{d.day}</span> {d.month} {d.year}, {d.weekday}
-                  </a>
-                  <span class="source">
-                    {L.issue}
-                    {issue}
-                  </span>
-                </li>
+                <>
+                  <span class="agenda__time">{L.issue(issue)}</span>
+                  <p>
+                    <a class="agenda__title" href={`/editions/${date}?lang=${lang}`}>{d.long}</a>
+                  </p>
+                </>
               );
             })}
-          </ul>
-        </main>
-      </body>
-    </html>
+          </div>
+        </article>
+      </div>
+    </Doc>
   );
 };

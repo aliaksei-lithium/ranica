@@ -146,9 +146,15 @@ Model: `claude-opus-5-5` through AI Gateway (`https://gateway.ai.cloudflare.com/
   "sport": "1 line or null",
   "german": {"cards": [{"card_id": "c5", "example": "..."}], "new_word": {"de": "...", "en": "...", "from_item_id": "n4"}},
   "hobby_fact": {"text": "...", "item_id": "n22"},
-  "tomorrow": "1 line"
+  "tomorrow": "1 line",
+  "on_this_day": {"text": "...", "author": "..."},
+  "deep": [{"rubric": "Tech", "item_id": "n1", "title": "...", "summary 6–8 lines": "..."}],
+  "back_news": [{"rubric": "World", "item_id": "n7", "title": "...", "summary": "..."}],
+  "word_of_day": {"de": "...", "en": "...", "example": "...", "extra": "plural, related words"}
 }
 ```
+The last four fields fill the back page (design/pages/back-page-*.html); the TypeScript type is
+`src/edit/brief.ts`.
 
 ## 4. Data model (D1 / SQLite)
 

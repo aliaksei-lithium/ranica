@@ -13,7 +13,8 @@ Languages: English and German (German text can be written at a learner level, B1
 Runs entirely on Cloudflare (Workers, Workflows, D1, R2, Browser Run) within the free tier;
 written in TypeScript.
 
-Status: **M0 — Look**. The page template, styles and a Hono Worker serving it with **fake data**.
+Status: **M0 — Look**. The page design from `design/` rendered by a Hono Worker with **fake data**:
+front page, back page, browser, phone, Kindle and e-ink views in English and German.
 No collectors, database, LLM or deliveries yet (see the roadmap in `docs/02-plan.md` §6).
 
 ## Run it
@@ -27,16 +28,40 @@ npm run render     # with dev running: PDFs/PNGs into out/ (needs a global Playw
 
 | Route | What |
 |---|---|
-| `/today?lang=en\|de&day=full\|thin&view=web\|print\|kindle` | the edition; `print` is an exact A4 sheet with fit-to-page, `kindle` is 1236 × 1648 px, one column |
-| `/today.eink?lang=…` | 800 × 480, 1-bit e-ink widget |
+| `/today?lang=en\|de&day=full\|thin&view=web\|print\|kindle\|eink&pages=1\|2` | the edition; `print` = A4 sheets (front + back) with fit-to-page, `kindle` = 1236 × 1648 px, `eink` = 800 × 480 widget |
+| `/today.eink?lang=…` | the e-ink widget |
 | `/editions`, `/editions/<date>` | fake archive |
 | `/api/edition?lang=…` | the facts + Brief JSON behind the page |
 | `/health` | status |
 
-Code map: `src/fake/` sample data from the design brief · `src/edit/brief.ts` editor output type ·
-`src/compose/` page template (Hono JSX) and blocks · `public/newspaper.css` the design and style sheet ·
-`public/fit.js` priority-based trimming · `scripts/render.mjs` local Playwright render ·
-`scripts/copy-fonts.mjs` copies the OFL fonts (Playfair Display, PT Serif, IBM Plex Sans) into `public/fonts`.
+Code map: `design/` the page design (tokens, `ranica.css`, reference pages) — the single source of the styles,
+copied to `public/css/` by the wrangler build step · `src/fake/` sample data from the reference pages ·
+`src/edit/brief.ts` editor output type · `src/compose/` templates (Hono JSX): `front.tsx`, `back.tsx`, `widget.tsx` ·
+`public/fit.js` priority-based trimming · `public/app.css` view glue · `scripts/render.mjs` local Playwright render ·
+`scripts/copy-fonts.mjs` self-hosts the OFL fonts (Playfair Display, PT Serif, IBM Plex Sans) in `public/fonts`.
+
+## Deploy
+
+GitHub Actions (`.github/workflows/`):
+
+- **CI** (every push and PR): typecheck, tests, `wrangler deploy --dry-run`, then renders all pages and
+  uploads them as the `ranica-pages` artifact (A4 PDFs, PNGs, Kindle, e-ink) — download it from the run page.
+- **Deploy**: push to `main` → tests → `wrangler deploy` to `https://ranica.<your-subdomain>.workers.dev`;
+  pull request → `wrangler versions upload --preview-alias pr-<n>` (a preview URL, production untouched);
+  "Run workflow" deploys any branch by hand.
+
+One-time setup:
+
+1. Cloudflare dashboard → Workers & Pages: pick a `workers.dev` subdomain if you have none yet.
+2. My Profile → API Tokens → Create Token → template **Edit Cloudflare Workers** (your account, all zones
+   or none). Copy the token. Copy the **Account ID** from the Workers & Pages overview.
+3. GitHub repo → Settings → Secrets and variables → Actions → New repository secret:
+   `CLOUDFLARE_API_TOKEN` and `CLOUDFLARE_ACCOUNT_ID`.
+4. Create a `main` branch from this one (and make it the default branch). The first push to `main`
+   deploys; PR previews work after that first deploy, because they need the Worker to exist.
+
+Without the secrets the deploy jobs skip with a notice, CI still runs. The deployed page is public and
+shows fake data; Cloudflare Access goes in front of it in M1 together with real data.
 
 Docs:
 

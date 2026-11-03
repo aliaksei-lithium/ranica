@@ -4,10 +4,11 @@ import type { Brief } from './edit/brief';
 
 export type Lang = 'en' | 'de';
 
-/** Block ids from the design brief §4. */
+/** Block ids from the design brief §4, plus the back page blocks (design/pages/back-page-*). */
 export type BlockId =
-  | 'masthead' | 'sun' | 'weather' | 'today' | 'sport' | 'german'
-  | 'news' | 'insight' | 'hobby' | 'onthisday' | 'footer';
+  | 'masthead' | 'sun' | 'weather' | 'today' | 'sport' | 'german' | 'hobby' | 'onthisday'
+  | 'news' | 'telegram' | 'qr' | 'insight' | 'footer'
+  | 'week' | 'hours' | 'depth' | 'world' | 'digest' | 'upcoming' | 'words';
 
 export interface Facts {
   lang: Lang;
@@ -20,15 +21,22 @@ export interface Facts {
   editionTitle: string;
   sun: { sunrise: string; sunset: string; dayMinutes: number; deltaMinutes: number } | null;
   countdowns: { label: string; days: number }[];
-  weather: { max: number; summary: string; glyph: 'sun' | 'cloud' | 'rain' | 'snow' } | null;
+  weather: { max: number; summary: string } | null;
   events: { id: string; time: string; title: string; durationMin?: number; place?: string }[];
-  tasks: { id: string; title: string }[];
-  items: { id: string; source: string; url: string }[];
+  tasks: { id: string; title: string; done?: boolean }[];
+  items: { id: string; source: string; url: string; minutes?: number }[];
   cards: { id: string; de: string; en: string }[];
+  telegram: { channel: string; posts: number }[];
+  /** Back page. */
+  week: { date: string; hi: number; lo: number; sky: string; events: number; calendar: string; due: string | null }[];
+  hourly: { hour: string; temp: number; feels: number; rainPct: number; windMs: number }[];
+  upcoming: { date: string; title: string; note?: string }[];
+  weekWords: { de: string; en: string }[];
   generatedAt: string;
   sourcesCount: number;
+  /** Public address of the web edition, without scheme, e.g. "ranica.app/today". */
   url: string;
-  /** Blocks whose data failed, with the one-line reason shown instead of the block. */
+  /** Blocks whose data failed: the source name shown in the "unavailable" line. */
   unavailable: Partial<Record<BlockId, string>>;
 }
 

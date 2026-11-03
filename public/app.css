@@ -1,0 +1,29 @@
+/* App-level glue around design/ranica.css: page backgrounds per view, the stacked desk,
+   the Kindle page size and the archive list. The design itself lives in design/. */
+html, body { margin: 0; }
+body { background: var(--desk); }
+.view-kindle, .view-eink { background: var(--paper); }
+
+/* Front and back page one under the other on the desk. */
+.desk--stack { flex-direction: column; align-items: center; gap: 24px; }
+
+/* Print view on screen: show the sheets like the reference pages. */
+@media screen {
+  .view-print { padding: 24px 0; }
+  .view-print .sheet { margin: 0 auto 24px; }
+}
+
+.sheet:last-child { break-after: auto; }
+
+@page kindle { size: 1236px 1648px; margin: 0; }
+.sheet--kindle { page: kindle; }
+
+.view-eink .widget { margin: 0; }
+
+.sheet--archive { min-height: 0; grid-template-rows: auto auto; }
+.agenda--archive { grid-template-columns: 26mm 1fr; margin-top: var(--space-3); row-gap: var(--space-1); }
+
+@media print {
+  .view-print { padding: 0; }
+  .view-print .sheet { margin: 0; }
+}

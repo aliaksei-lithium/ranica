@@ -3,3 +3,5 @@ node_modules/
 .dev.vars
 out/
 *.log
+public/css/
+dist/
