@@ -11,7 +11,10 @@ export default defineConfig({
       miniflare: {
         bindings: { TEST_MIGRATIONS: await readD1Migrations(path.join(import.meta.dirname, 'migrations')), PROBE_KEY: 'test-key' },
         // Test-only binding so introspectWorkflow() can see instances created through ctx.exports.
-        workflows: { SOURCE_REFRESH: { name: 'source-refresh', className: 'SourceRefreshWorkflow' } },
+        workflows: {
+          SOURCE_REFRESH: { name: 'source-refresh', className: 'SourceRefreshWorkflow' },
+          EDITION: { name: 'edition', className: 'EditionWorkflow' },
+        },
       },
     })),
   ],

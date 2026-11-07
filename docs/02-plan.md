@@ -253,10 +253,17 @@ print view. Kindle and e-mail delivery stay in the code and design but are not w
   IPs) with `/probe/sources` to confirm nothing blocks them; otherwise fall back to Browser Run
   `/markdown` for Telegram.
 - `EditionWorkflow` with one step per source; editor with Claude via AI Gateway; fallback editor.
+  *(Done 2026-11-07: `EditionWorkflow` load → weather → editor → store; Claude Opus 5.5 with structured
+  output (zod schema), effort `medium`, server-side refusal fallbacks (`fallbacks: "default"`), id
+  validation; no-LLM fallback editor when there is no key or Claude fails; AI Gateway via the
+  optional `AI_GATEWAY_URL` var. The Workers AI middle step is not built. No prompt caching: one
+  call per day, so a cache entry would always have expired.)*
 - Compose + fit-to-page; edition HTML (and the A4 PDF from the browser session) to R2.
 - Web: `/today` (set as browser home page, readable on the phone), `/today?view=print` with a
   print button, `/editions/<date>`, archive list, behind Cloudflare Access.
 - Cron scheduler at your wake time builds the edition so it is ready when you open the page.
+  *(Done: the hourly cron starts the edition in the hour that contains wake time − 30 min, one
+  instance id per reader and day; Free plan, so no 15-minute cron.)*
 - Done when: you read Ranica for 5 mornings in a row (browser, phone or paper) without touching
   the laptop to make it.
 

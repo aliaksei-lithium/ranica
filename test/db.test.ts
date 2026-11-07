@@ -8,7 +8,8 @@ import {
   insertItems, itemsForUser, pruneItems, recordFetch, retentionCutoff, sourceStatus, subscribeAllUsers, syncSources,
 } from '../src/db/queries';
 import type { RefreshOutput } from '../src/workflows/source-refresh';
-import worker, { REFRESH_CRON } from '../src/index';
+import worker from '../src/index';
+import { REFRESH_CRON } from '../src/scheduled';
 import tagesschauXml from './fixtures/rss-tagesschau.xml?raw';
 import telegramHtml from './fixtures/telegram-zerkalo.html?raw';
 

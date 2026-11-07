@@ -3,6 +3,8 @@
 // UNIQUE (source_id, hash) index, and old items are pruned.
 import type { Item } from '../collect/item';
 import type { Source } from '../collect/sources';
+import type { Reader } from '../edition/facts';
+import type { Edition } from '../model';
 
 export const ITEM_RETENTION_DAYS = 7;
 
@@ -157,5 +159,87 @@ export async function sourceStatus(db: D1Database): Promise<SourceStatus[]> {
        GROUP BY s.id ORDER BY s.id`,
     )
     .all<SourceStatus>();
+  return results;
+}
+
+// ---------- readers and editions ----------
+
+
+export async function getReader(db: D1Database, userId: number): Promise<Reader | null> {
+  const row = await db
+    .prepare(
+      `SELECT u.id, u.name, u.edition_title AS editionTitle, u.locale, u.learner_level AS learnerLevel, u.timezone, u.city,
+              u.lat, u.lon, u.wake_time AS wakeTime, COALESCE(p.context_md, '') AS contextMd
+       FROM user u LEFT JOIN profile p ON p.user_id = u.id WHERE u.id = ?1`,
+    )
+    .bind(userId)
+    .first<Reader>();
+  return row ?? null;
+}
+
+export async function listReaders(db: D1Database): Promise<Reader[]> {
+  const { results } = await db
+    .prepare(
+      `SELECT u.id, u.name, u.edition_title AS editionTitle, u.locale, u.learner_level AS learnerLevel, u.timezone, u.city,
+              u.lat, u.lon, u.wake_time AS wakeTime, COALESCE(p.context_md, '') AS contextMd
+       FROM user u LEFT JOIN profile p ON p.user_id = u.id ORDER BY u.id`,
+    )
+    .all<Reader>();
+  return results;
+}
+
+/** Issue number for `date`: the existing one when re-running a day, else one more than the last. */
+export async function nextIssue(db: D1Database, userId: number, date: string): Promise<number> {
+  const row = await db
+    .prepare(`SELECT COALESCE((SELECT issue FROM edition WHERE user_id = ?1 AND date = ?2), (SELECT MAX(issue) FROM edition WHERE user_id = ?1) + 1, 1) AS n`)
+    .bind(userId, date)
+    .first<{ n: number }>();
+  return row!.n;
+}
+
+export interface EditionRecord {
+  userId: number;
+  date: string;
+  issue: number;
+  edition: Edition;
+  model: string | null;
+  tokensIn: number | null;
+  tokensOut: number | null;
+  costCents: number | null;
+  error: string | null;
+  generatedAt: string;
+}
+
+export async function saveEdition(db: D1Database, r: EditionRecord): Promise<void> {
+  await db
+    .prepare(
+      `INSERT INTO edition (user_id, date, issue, status, facts_json, brief_json, tokens_in, tokens_out, cost_cents, error, generated_at, model)
+       VALUES (?1, ?2, ?3, 'ready', ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11)
+       ON CONFLICT (user_id, date) DO UPDATE SET issue = excluded.issue, status = 'ready', facts_json = excluded.facts_json,
+         brief_json = excluded.brief_json, tokens_in = excluded.tokens_in, tokens_out = excluded.tokens_out,
+         cost_cents = excluded.cost_cents, error = excluded.error, generated_at = excluded.generated_at, model = excluded.model`,
+    )
+    .bind(r.userId, r.date, r.issue, JSON.stringify(r.edition.facts), JSON.stringify(r.edition.brief), r.tokensIn, r.tokensOut,
+      r.costCents, r.error, r.generatedAt, r.model)
+    .run();
+}
+
+/** The stored edition for a date, or the newest one when `date` is omitted. */
+export async function loadEdition(db: D1Database, userId: number, date?: string): Promise<(Edition & { date: string }) | null> {
+  const row = await db
+    .prepare(
+      `SELECT date, facts_json, brief_json FROM edition WHERE user_id = ?1 AND status = 'ready' AND (?2 IS NULL OR date = ?2)
+       ORDER BY date DESC LIMIT 1`,
+    )
+    .bind(userId, date ?? null)
+    .first<{ date: string; facts_json: string; brief_json: string }>();
+  return row ? { date: row.date, facts: JSON.parse(row.facts_json), brief: JSON.parse(row.brief_json) } : null;
+}
+
+export async function listEditions(db: D1Database, userId: number, limit = 60): Promise<{ date: string; issue: number }[]> {
+  const { results } = await db
+    .prepare(`SELECT date, issue FROM edition WHERE user_id = ?1 AND status = 'ready' ORDER BY date DESC LIMIT ?2`)
+    .bind(userId, limit)
+    .all<{ date: string; issue: number }>();
   return results;
 }

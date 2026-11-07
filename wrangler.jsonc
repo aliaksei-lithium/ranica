@@ -29,16 +29,20 @@
   "exports": {
     // One step per source → D1 items (docs/02-plan.md §3). Started by the hourly cron below
     // (Workflow `schedules` need the paid plan) or by hand with POST /admin/refresh.
-    "SourceRefreshWorkflow": { "type": "workflow", "name": "source-refresh" }
+    "SourceRefreshWorkflow": { "type": "workflow", "name": "source-refresh" },
+    // One instance per reader and day, started by the same cron in the hour before wake time,
+    // or by hand with POST /admin/edition.
+    "EditionWorkflow": { "type": "workflow", "name": "edition" }
   },
-  "triggers": { "crons": ["0 * * * *"] } // must match REFRESH_CRON in src/index.ts
+  "vars": {
+    "PUBLIC_URL": "ranica.aliaksei-zhynhiarouski.workers.dev/today"
+    // "AI_GATEWAY_URL": "https://gateway.ai.cloudflare.com/v1/<account id>/<gateway>/anthropic"
+  },
+  // Secrets (wrangler secret put): PROBE_KEY, ANTHROPIC_API_KEY.
+  "triggers": { "crons": ["0 * * * *"] } // must match REFRESH_CRON in src/scheduled.ts
 
   // Later in M1:
   // "r2_buckets": [{ "binding": "EDITIONS", "bucket_name": "ranica-editions" }],
   // "browser": { "binding": "BROWSER" },
   // "ai": { "binding": "AI" },
-  // "workflows": [
-  //   { "name": "edition", "binding": "EDITION_WORKFLOW", "class_name": "EditionWorkflow" },
-  // ],
-  // edition scheduler: add "*/15 * * * *" to triggers.crons
 }
