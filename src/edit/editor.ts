@@ -41,9 +41,9 @@ Rules:
 - insight: connect two or more facts from the input into something useful for the reader today. If nothing connects, return an empty string; never write generic advice.
 - weather_note and tomorrow: only from the weather facts.
 - When the reader language is "en", write English. When it is "de", write German at the reader's learner level: short sentences (under about 15 words), common words, and a short English gloss in parentheses for a rare word.
-- german.new_word: one useful word at the reader's level that appears in a German-language item; nouns with article. word_of_day: another useful word with forms and a related word.
+- new_word: one useful word at the reader's level that appears in a German-language item; nouns with article. word_of_day: another useful word with forms and a related word.
 - on_this_day: a well-known German proverb or quote that fits the season or the day.
-- Leave arrays empty and nullable fields null when the input has nothing for them (no events, no tasks, no cards, no sport rules, no hobby items).`;
+- Leave a field as an empty string when the input has nothing for it.`;
 
 export interface EditorResult {
   brief: Brief;

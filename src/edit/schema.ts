@@ -11,11 +11,19 @@ const newsPick = z.object({
   summary: z.string().describe('At most 2 short sentences (about 200 characters) in the reader language'),
 });
 
+// Kept small on purpose: structured outputs compile the schema into a grammar with a size limit
+// ("compiled grammar is too large", 2026-11-07). So no nullable objects (an empty string means
+// "none"), and no fields without input yet (agenda, tasks, vocabulary cards, sport, hobby): toBrief
+// fills those. Add them back here when calendar, tasks and vocabulary arrive.
+const word = z.object({
+  de: z.string().describe('German word, nouns with article; empty string if none'),
+  en: z.string(),
+  example: z.string().describe('A simple German example sentence'),
+});
+
 export const BriefSchema = z.object({
   headline: z.string().describe('The day in at most 60 characters; becomes the page title'),
   weather_note: z.string().describe('One practical line (at most 120 characters) based only on the weather facts; empty if none'),
-  agenda: z.array(z.object({ event_id: z.string(), note: z.string() })).describe('Notes for calendar events; empty when there are no events'),
-  tasks: z.array(z.object({ task_id: z.string(), context: z.string() })).describe('Context for tasks; empty when there are no tasks'),
   news: z.array(newsPick).describe('Front page: up to 5 rubrics with 2-4 items each, most important first; title at most 70 characters, summary one sentence of at most 140 characters'),
   briefs: z
     .array(z.object({
@@ -32,34 +40,30 @@ export const BriefSchema = z.object({
     }))
     .describe('One entry per input Telegram channel'),
   insight: z.string().describe('2-4 sentences, at most 400 characters, connecting facts from the input; empty rather than generic'),
-  sport: z.string().nullable().describe('null unless the input has sport rules'),
-  german: z.object({
-    cards: z.array(z.object({ card_id: z.string(), example: z.string() })).describe('One example sentence per due card; empty when no cards are given'),
-    new_word: z
-      .object({ de: z.string(), en: z.string(), example: z.string(), from_item_id: z.string() })
-      .nullable()
-      .describe('One useful B1 word that appears in a German input item, with article for nouns; example is a simple German sentence'),
-  }),
-  hobby_fact: z.object({ text: z.string(), item_id: z.string().nullable() }).nullable().describe('null unless the input has hobby items'),
-  on_this_day: z
-    .object({ text: z.string(), author: z.string().nullable() })
-    .nullable()
-    .describe('A well-known German proverb or quote that fits the day (author or "Sprichwort"/"German proverb")'),
+  new_word: word.extend({ from_item_id: z.string() }).describe('One useful B1 word that appears in a German input item'),
+  on_this_day: z.object({ text: z.string(), author: z.string() })
+    .describe('A well-known German proverb or quote that fits the day; author or "Sprichwort"/"German proverb"'),
   tomorrow: z.string().describe('At most 60 characters about tomorrow, from the weather facts'),
   deep: z
     .array(z.object({ rubric: z.string(), item_id: z.string(), title: z.string(), body: z.string().describe('5-7 sentences, at most 650 characters, only facts from the item') }))
     .describe('Back page: 3-4 longer summaries of the most important front-page items'),
   back_news: z.array(newsPick).describe('Back page: 2-4 rubrics with 3-5 items each, not used on the front page or in briefs'),
-  word_of_day: z
-    .object({ de: z.string(), en: z.string(), example: z.string(), extra: z.string().describe('Plural or forms, one related word') })
-    .nullable(),
+  word_of_day: word.extend({ extra: z.string().describe('Plural or forms, one related word') }),
 });
 
 export type BriefOutput = z.infer<typeof BriefSchema>;
 
+/** The editor's output as a full Brief: fields the schema leaves out are empty. */
 export function toBrief(o: BriefOutput): Brief {
+  const { new_word, on_this_day, word_of_day, ...rest } = o;
   return {
-    ...o,
-    on_this_day: o.on_this_day ? { text: o.on_this_day.text, ...(o.on_this_day.author ? { author: o.on_this_day.author } : {}) } : null,
+    ...rest,
+    agenda: [],
+    tasks: [],
+    sport: null,
+    hobby_fact: null,
+    german: { cards: [], new_word: new_word.de ? new_word : null },
+    on_this_day: on_this_day.text ? { text: on_this_day.text, ...(on_this_day.author ? { author: on_this_day.author } : {}) } : null,
+    word_of_day: word_of_day.de ? word_of_day : null,
   };
 }

@@ -6,7 +6,7 @@ import { buildEditorInput, buildFacts, localNow, type Reader } from '../src/edit
 import { validateBrief } from '../src/edit/validate';
 import { fallbackBrief } from '../src/edit/fallback';
 import { runEditor, EDITOR_MODEL, EditorRefusal } from '../src/edit/editor';
-import { BriefSchema } from '../src/edit/schema';
+import type { BriefOutput } from '../src/edit/schema';
 import type { Brief } from '../src/edit/brief';
 import type { UserItem } from '../src/db/queries';
 import { insertItems, loadEdition, subscribeAllUsers, syncSources } from '../src/db/queries';
@@ -77,6 +77,18 @@ const brief = (over: Partial<Brief> = {}): Brief => ({
   back_news: [{ rubric: 'World', item_id: 'n3', title: 'World story', summary: 'More.' }],
   word_of_day: null, ...over,
 });
+
+/** The editor's raw output (BriefSchema shape): no nullable objects, empty string = none. */
+const output = (): BriefOutput => {
+  const b = brief();
+  return {
+    headline: b.headline, weather_note: b.weather_note, news: b.news, briefs: [], telegram_digest: b.telegram_digest,
+    insight: b.insight, tomorrow: b.tomorrow, deep: b.deep, back_news: b.back_news,
+    new_word: { de: 'der Titel', en: 'title', example: 'Der Titel ist kurz.', from_item_id: 'n1' },
+    on_this_day: { text: 'Morgenstund hat Gold im Mund.', author: 'Sprichwort' },
+    word_of_day: { de: '', en: '', example: '', extra: '' },
+  };
+};
 
 /** A Messages API response body carrying `brief` as the JSON text output. */
 const anthropicResponse = (b: unknown, over: Record<string, unknown> = {}) => ({
@@ -158,7 +170,6 @@ describe('fallback editor', () => {
     expect(b.news.map((n) => [n.rubric, n.item_id])).toEqual([['Berlin', 'n4'], ['Berlin', 'n2'], ['Germany', 'n1'], ['World', 'n3']]);
     expect(b.telegram_digest).toEqual([{ channel: '@zerkalo_io', summary: '1 пост', points: ['Пост'] }]);
     expect(b.tomorrow).toBe('+5° / +1°, rain, rain 80 %');
-    expect(BriefSchema.safeParse({ ...b, on_this_day: null }).success).toBe(true);
   });
 
   it('uses German rubric names for a German reader', () => {
@@ -177,7 +188,7 @@ describe('Claude editor', () => {
       expect(String(url)).toBe('https://gateway.example/anthropic/v1/messages');
       sent = JSON.parse(String(init!.body));
       headers = new Headers(init!.headers);
-      return Response.json(anthropicResponse(brief()));
+      return Response.json(anthropicResponse(output()));
     }) as typeof fetch;
     const r = await runEditor(input, { apiKey: 'sk-test', gatewayUrl: 'https://gateway.example/anthropic', fetch: fetcher });
     expect(sent).toMatchObject({ model: 'claude-sonnet-5-5', fallbacks: 'default', output_config: { effort: 'medium', format: { type: 'json_schema' } } });
@@ -185,6 +196,11 @@ describe('Claude editor', () => {
     expect(String(sent.system)).toContain('Use only ids that appear in the input');
     expect(r.brief.headline).toBe('A calm Saturday');
     expect(r.brief.on_this_day).toEqual({ text: 'Morgenstund hat Gold im Mund.', author: 'Sprichwort' });
+    expect(r.brief.german.new_word).toMatchObject({ de: 'der Titel', from_item_id: 'n1' });
+    expect(r.brief.word_of_day).toBeNull(); // empty strings mean "none"
+    expect(r.brief).toMatchObject({ agenda: [], tasks: [], sport: null, hobby_fact: null });
+    const schema = JSON.stringify((sent.output_config as { format: { schema: unknown } }).format.schema);
+    expect(schema).not.toContain('anyOf'); // nullable unions blow up the compiled grammar
     expect(r).toMatchObject({ model: EDITOR_MODEL, tokensIn: 9000, tokensOut: 3000, costCents: 4.8 });
   });
 
@@ -194,7 +210,7 @@ describe('Claude editor', () => {
     const fetcher = (async (_url: string | URL | Request, init?: RequestInit) => {
       sent = JSON.parse(String(init!.body));
       headers = new Headers(init!.headers);
-      return Response.json(anthropicResponse(brief(), { model: 'claude-haiku-5-5' }));
+      return Response.json(anthropicResponse(output(), { model: 'claude-haiku-5-5' }));
     }) as typeof fetch;
     const r = await runEditor(input, { apiKey: 'sk-test', model: 'claude-haiku-5-5', fetch: fetcher });
     expect(sent.model).toBe('claude-haiku-5-5');
