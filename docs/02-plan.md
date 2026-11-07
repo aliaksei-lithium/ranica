@@ -4,7 +4,8 @@
 
 **One sentence.** Every morning Ranica composes a one-page personal newspaper from your
 calendar, tasks, weather, chosen news sources and learning goals, written by an AI editor that
-knows your context, and delivers it to your browser, printer, Kindle or e-ink screen.
+knows your context, and is ready as a page in your browser and on your phone, and to print.
+Kindle and e-ink outputs exist in the design and come later (M4).
 
 **Primary user (you).** Lives in a city with real winters, works in software (Java/Kotlin),
 learns German (A2→B1), has hobbies and a sport routine, reads Telegram channels and a few
@@ -93,7 +94,7 @@ step**, **10 browser-minutes per day**, **no outbound email on Free** (Resend in
   step 6  compose: Brief → HTML string, store to R2                    │
   step 7  render: Browser Run session: load HTML → measure/trim →     │
           pdf (A4) → pdf (Kindle size) → png (e-ink) → R2             │
-  step 8  deliveries: Resend email (+Kindle), webhook; record in D1   ─┘
+  step 8  deliveries (M4): Resend email (+Kindle), webhook; record in D1 ─┘
       │
       ▼
  Web Worker (Hono + static assets)
@@ -130,7 +131,7 @@ Unchanged: a stable, cached system prompt (role, language rules, B1 rules, JSON 
 invent") and a volatile user message (profile context, date, weather facts, events, tasks,
 items[], vocab_due[], hobby topics, sport rule result). Output uses Anthropic structured outputs
 with the schema below; any `item_id`/`event_id`/`card_id` not present in the input is dropped.
-Model: `claude-opus-5-5` through AI Gateway (`https://gateway.ai.cloudflare.com/v1/<acct>/<gw>/anthropic`),
+Model: `claude-sonnet-5-5` (changed from Opus 5.5 on 2026-11-07 for cost; `EDITOR_MODEL` var, `claude-haiku-5-5` is the cheapest option) through AI Gateway (`https://gateway.ai.cloudflare.com/v1/<acct>/<gw>/anthropic`),
 `output_config.effort: "medium"`, `fallbacks: "default"`. Fallback chain: retry once → Workers AI
 (`@cf/meta/llama-3.3-70b-instruct-fp8-fast`, JSON mode) → no-LLM Brief (facts only).
 
@@ -162,16 +163,19 @@ The last four fields fill the back page (design/pages/back-page-*.html); the Typ
 |---|---|
 | `user` | id, email, locale (`en`/`de`), learner_level, timezone, city, lat, lon, wake_time, plan, kindle_email, created_at |
 | `profile` | user_id, context_md, hobbies_json, sport_rules_json, countdowns_json |
-| `source` | id, kind (`rss`/`telegram`/`gnews_query`/`ics`/`todoist`/`md_tasks`), config_json (encrypted for private kinds), shared (0/1), etag, last_fetch_at, last_error |
+| `source` | id, kind (`rss`/`telegram`/`gnews_query`/`ics`/`todoist`/`md_tasks`), name, config_json (encrypted for private kinds), shared (0/1), active, etag, last_modified, last_fetch_at, last_ok_at, last_status, last_error |
 | `subscription` | user_id, source_id, rubric, weight |
-| `item` | id, source_id, external_id, url, title, body (≤ 2 kB), published_at, fetched_at, hash — unique (source_id, hash) |
+| `item` | id, source_id, external_id, url, title, body (≤ 2 kB), link (Telegram: announced article), published_at, fetched_at, hash — unique (source_id, hash) |
 | `vocab_card` | id, user_id, de, en, example, fsrs_json, due_at, created_from_item_id |
 | `review` | card_id, reviewed_at, rating, mode (`paper`/`web`) |
-| `edition` | id, user_id, date, status, brief_json, r2_prefix, tokens_in, tokens_out, cost_cents, browser_ms, generated_at — unique (user_id, date) |
+| `edition` | id, user_id, date, issue, status, facts_json, brief_json, error, r2_prefix, tokens_in, tokens_out, cost_cents, browser_ms, generated_at — unique (user_id, date) |
 | `delivery` | edition_id, channel, target, status, error, sent_at |
 | `session` | only if Cloudflare Access is not used; otherwise none |
 
-Retention: items 7 days, editions 90 days (R2 objects deleted by a lifecycle rule), reviews forever.
+Schema: `migrations/0001_init.sql`. Shared sources are synced from `src/collect/sources.ts` by the
+refresh Workflow (unchanged rows are not rewritten); the M1 reader comes from `seed/me.sql`.
+
+Retention: items 7 days (by publication date, else fetch date; older items are not inserted), editions 90 days (R2 objects deleted by a lifecycle rule), reviews forever.
 Write budget check for 100 users: 50 shared sources × 24 refreshes × ~5 new items = 6 k item
 rows + 100 editions + ~300 deliveries + reviews ≈ 7 k writes/day of the 100 k allowed.
 
@@ -189,7 +193,7 @@ rows + 100 editions + ~300 deliveries + reviews ≈ 7 k writes/day of the 100 k 
 | ICS | `ical.js` or `node-ical` (nodejs_compat) | Recurrence expansion; cap at 60 days window to keep CPU low |
 | Telegram | `fetch` + `HTMLRewriter` (built into Workers, streaming, ~0 CPU) | Parse `t.me/s/<channel>` without loading a DOM |
 | Weather | Open-Meteo JSON | No key |
-| LLM | **Anthropic TypeScript SDK** (`@anthropic-ai/sdk`) with `baseURL` set to **AI Gateway**; model `claude-opus-5-5`; structured outputs | Quality for selection and B1 German; gateway gives logs, caching, rate limits for free |
+| LLM | **Anthropic TypeScript SDK** (`@anthropic-ai/sdk`) with `baseURL` set to **AI Gateway**; model `claude-sonnet-5-5` (`EDITOR_MODEL` var); structured outputs | Quality for selection and B1 German; gateway gives logs, caching, rate limits for free |
 | Free LLM fallback | **Workers AI** Llama 3.3 70B (JSON mode) | ~7 editions/day inside the 10 k neurons |
 | Spaced repetition | `ts-fsrs` (FSRS-6, TypeScript, used by many Anki-like apps) | Same algorithm as the earlier Kotlin choice |
 | Email (+Kindle) | **Resend** HTTP API, sending domain on Cloudflare DNS; PDF as attachment | Free tier ≈ 100/day; Cloudflare's own sending needs Workers Paid |
@@ -238,17 +242,53 @@ Each milestone ends with something you can read in the morning.
 - Done when: the printed page looks like the reference photo and you want to read it.
 
 ### M1 — My edition, single user (1–2 weeks)
-- D1 schema + migrations; your user row created by a seed script.
-- Collectors: ICS (Google secret URL), 3–5 RSS feeds, 2–3 Telegram channels, Open-Meteo,
-  `tasks.md` kept in R2 and edited via a tiny `/tasks` page.
-- **Day-1 check**: fetch `t.me/s/<channel>` and the feeds from a deployed Worker (Cloudflare egress
-  IPs) to confirm nothing blocks them; otherwise fall back to Browser Run `/markdown` for Telegram.
+Focus: **the page itself** — opened in the browser (home page), on the phone, and printed from the
+print view. Kindle and e-mail delivery stay in the code and design but are not worked on in M1
+(moved to M4).
+- D1 schema + migrations; your user row created by a seed script. *(Done: `migrations/0001_init.sql`,
+  `seed/me.sql`, `SourceRefreshWorkflow` started by an hourly Cron Trigger (Workflow `schedules` need the paid plan), `/admin/refresh`.)*
+- Collectors: ICS (Google secret URL), the RSS feeds and the Telegram channel from §6.1,
+  Open-Meteo, `tasks.md` kept in R2 and edited via a tiny `/tasks` page.
+- **Day-1 check**: fetch `t.me/s/zerkalo_io` and the feeds from a deployed Worker (Cloudflare egress
+  IPs) with `/probe/sources` to confirm nothing blocks them; otherwise fall back to Browser Run
+  `/markdown` for Telegram.
 - `EditionWorkflow` with one step per source; editor with Claude via AI Gateway; fallback editor.
-- Compose + fit-to-page in one browser session; artifacts to R2.
-- Web: `/today` (set as browser home page), `/editions/<date>`, archive list, behind Cloudflare
-  Access.
-- Delivery: Resend email with PDF → your Kindle address; cron scheduler at your wake time.
-- Done when: you read Ranica for 5 mornings in a row without touching the laptop.
+  *(Done 2026-11-07: `EditionWorkflow` load → weather → editor → store; Claude Sonnet 5.5 with structured
+  output (zod schema), effort `medium`, server-side refusal fallbacks (`fallbacks: "default"`), id
+  validation; no-LLM fallback editor when there is no key or Claude fails; AI Gateway via the
+  optional `AI_GATEWAY_URL` var. The Workers AI middle step is not built. No prompt caching: one
+  call per day, so a cache entry would always have expired.)*
+- Compose + fit-to-page; edition HTML (and the A4 PDF from the browser session) to R2.
+- Web: `/today` (set as browser home page, readable on the phone), `/today?view=print` with a
+  print button, `/editions/<date>`, archive list, behind Cloudflare Access.
+- Cron scheduler at your wake time builds the edition so it is ready when you open the page.
+  *(Done: the hourly cron starts the edition in the hour that contains wake time − 30 min, one
+  instance id per reader and day; Free plan, so no 15-minute cron.)*
+- Done when: you read Ranica for 5 mornings in a row (browser, phone or paper) without touching
+  the laptop to make it.
+
+### 6.1 Sources for M1
+
+All German-language; the editor writes the page in `en` or `de` and keeps source tags. URLs were
+fetched successfully on 2026-11-07 from a home connection (sizes are one snapshot).
+**Day-1 check passed** on 2026-11-07 from the deployed Worker (`/probe/sources`, colo TXL): 7/7
+sources returned 200 and parsed, 22–284 ms each, none truncated — Cloudflare egress is not blocked,
+so the Browser Run `/markdown` fallback for Telegram is not needed.
+
+| Id | Source | Feed | Rubric | Snapshot |
+|---|---|---|---|---|
+| `tagesschau-inland` | tagesschau | `https://www.tagesschau.de/inland/index~rss2.xml` | Germany | 49 items, 67 kB |
+| `tagesschau-ausland` | tagesschau | `https://www.tagesschau.de/ausland/index~rss2.xml` | World | 70 items, 95 kB |
+| `tagesspiegel-berlin` | Tagesspiegel | `https://www.tagesspiegel.de/contentexport/feed/berlin` | Berlin | 100 items, 88 kB |
+| `faz-inland` | FAZ | `https://www.faz.net/rss/aktuell/politik/inland/` | Germany | 39 items, 63 kB |
+| `faz-ausland` | FAZ | `https://www.faz.net/rss/aktuell/politik/ausland/` | World | 44 items, 71 kB |
+| `berliner-zeitung` | Berliner Zeitung | `https://www.berliner-zeitung.de/feed.xml` | — (all sections; editor assigns Berlin/Germany/World) | 100 items, 90 kB |
+| `tg-zerkalo` | Telegram @zerkalo_io (Зеркало, Russian) | `https://t.me/s/zerkalo_io` (public web preview, last 20 posts) | Telegram digest | 20 posts, 141 kB HTML |
+
+FAZ's all-news feed (`/rss/aktuell/`, 262 kB, 159 items) is skipped to keep each parse well under
+the 10 ms CPU budget; the two politics sections cover Germany and World. Berliner Zeitung has no
+working section feeds (`/feed`, `/rss`, `/news.rss` are 404 or HTML), so its single feed is used.
+Tech, hobby and other rubrics come later (M2/M3 catalogue).
 
 ### M2 — Learning and personal blocks (1 week)
 - Vocabulary: CSV/Anki import (Python script → CSV → `/import`), `ts-fsrs` scheduling, 5 due cards
@@ -268,6 +308,7 @@ Each milestone ends with something you can read in the morning.
 - Done when: a friend signs up and gets a page the next morning without your help.
 
 ### M4 — More outputs and sources (ongoing)
+- Delivery: Resend e-mail with the PDF → your Kindle address (the `view=kindle` page already exists), delivery records in D1.
 - E-ink endpoint (`/u/<token>/today.png` at device size), TRMNL plugin recipe, Kindle-dashboard mode.
 - Email-to-print, thermal ESC/POS raster, EPUB output.
 - Google Calendar OAuth, Todoist, Gmail "what needs an answer" (after Google verification).
@@ -305,7 +346,7 @@ Each milestone ends with something you can read in the morning.
 ## 9. Decisions still open (defaults chosen, change if you disagree)
 1. **Auth** — Cloudflare Access by default (zero code); own magic links via Resend if Access's
    free user cap or UX gets in the way.
-2. **LLM** — Claude Opus 5.5 via AI Gateway by default (≈ $4/month for one user); Workers AI
+2. **LLM** — Claude Sonnet 5.5 by default (≈ 7 cents per edition, ≈ $2/month for one user; Opus 5.5 measured 15 cents); Workers AI
    Llama for a fully free mode with lower German quality.
 3. **Kindle format** — device-sized PDF by default; EPUB later.
 4. **Edition name on the masthead** — "Ranica" plus the user's own title.
@@ -319,4 +360,6 @@ Each milestone ends with something you can read in the morning.
 3. Add `render/browser.ts` (one session: load → measure → trim → pdf → png) and a local Playwright
    script for fast layout iteration.
 4. Print it and iterate on typography before any collector is written.
-5. From a deployed Worker, fetch `t.me/s/tagesschau` and the chosen feeds once to confirm access.
+5. From a deployed Worker, open `/probe/sources?key=…` to fetch `t.me/s/zerkalo_io` and the §6.1
+   feeds once and confirm Cloudflare egress is not blocked. **Done 2026-11-07: 7/7 OK.** *(Steps 1–2 and the local Playwright
+   script are done; `src/collect/rss.ts`, `telegram.ts` and the probe route exist.)*

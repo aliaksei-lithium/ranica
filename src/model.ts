@@ -7,7 +7,7 @@ export type Lang = 'en' | 'de';
 /** Block ids from the design brief §4, plus the back page blocks (design/pages/back-page-*). */
 export type BlockId =
   | 'masthead' | 'sun' | 'weather' | 'today' | 'sport' | 'german' | 'hobby' | 'onthisday'
-  | 'news' | 'telegram' | 'qr' | 'insight' | 'footer'
+  | 'news' | 'newsextra' | 'telegram' | 'qr' | 'insight' | 'footer'
   | 'week' | 'hours' | 'depth' | 'world' | 'digest' | 'upcoming' | 'words';
 
 export interface Facts {

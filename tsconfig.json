@@ -3,8 +3,14 @@
     "target": "ES2022",
     "module": "ES2022",
     "moduleResolution": "Bundler",
-    "lib": ["ES2022"],
-    "types": ["@cloudflare/workers-types"],
+    "lib": [
+      "ES2022",
+      "ESNext.Disposable"
+    ],
+    "types": [
+      "@cloudflare/workers-types",
+      "@cloudflare/vitest-plugin/types"
+    ],
     "jsx": "react-jsx",
     "jsxImportSource": "hono/jsx",
     "strict": true,
@@ -13,5 +19,8 @@
     "isolatedModules": true,
     "noEmit": true
   },
-  "include": ["src", "test"]
+  "include": [
+    "src",
+    "test"
+  ]
 }

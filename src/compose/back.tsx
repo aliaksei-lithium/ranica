@@ -65,20 +65,24 @@ export const BackPage: FC<{ e: Edition }> = ({ e }) => {
                     </td>
                   ))}
                 </tr>
-                <tr>
-                  <th scope="row">{rowCalendar}</th>
-                  {f.week.map((w) => (
-                    <td>
-                      <span class="num">{w.events}</span> {w.calendar}
-                    </td>
-                  ))}
-                </tr>
-                <tr>
-                  <th scope="row">{rowDue}</th>
-                  {f.week.map((w) => (
-                    <td>{w.due ?? '—'}</td>
-                  ))}
-                </tr>
+                {f.week.some((w) => w.events > 0 || w.calendar) && (
+                  <tr>
+                    <th scope="row">{rowCalendar}</th>
+                    {f.week.map((w) => (
+                      <td>
+                        <span class="num">{w.events}</span> {w.calendar}
+                      </td>
+                    ))}
+                  </tr>
+                )}
+                {f.week.some((w) => w.due) && (
+                  <tr>
+                    <th scope="row">{rowDue}</th>
+                    {f.week.map((w) => (
+                      <td>{w.due ?? '—'}</td>
+                    ))}
+                  </tr>
+                )}
               </tbody>
             </table>
           </section>

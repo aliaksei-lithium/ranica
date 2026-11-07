@@ -27,6 +27,28 @@ export function rubrics(e: Edition, picks: NewsPick[], max = 4, perRubric = 4): 
   return out;
 }
 
+/**
+ * One news rubric. Items after the second carry their own lower priority, so fit.js drops them one
+ * by one before it has to drop a whole rubric, the Telegram block or the insight.
+ */
+const NewsRubric: FC<{ r: Rubric; more?: string }> = ({ r, more }) => (
+  <section class="rubric" id={slug(r.name)} {...fit('news')}>
+    <span class="label">
+      {r.name}
+      {more && <span class="label__sub">{more}</span>}
+    </span>
+    {r.items.map((n, i) => (
+      <article class="item" {...(i >= 2 ? fit('newsextra') : {})}>
+        <a class="item__title" href={n.url}>{n.title}</a>
+        <p class="item__summary">
+          {n.summary}
+          <span class="tag">{n.source}</span>
+        </p>
+      </article>
+    ))}
+  </section>
+);
+
 export const FrontPage: FC<{ e: Edition; kindle?: boolean }> = ({ e, kindle }) => {
   const { facts: f, brief: b } = e;
   const L = t(f.lang);
@@ -39,6 +61,10 @@ export const FrontPage: FC<{ e: Edition; kindle?: boolean }> = ({ e, kindle }) =
   }).slice(0, 5);
   const nw = b.german.new_word;
   const news = rubrics(e, b.news, 3);
+  // A day without calendar and tasks leaves the wide left column almost empty: the first rubric
+  // moves there so the narrow right column does not overflow (fit.js would drop whole rubrics).
+  const leftNews = f.events.length === 0 && f.tasks.length === 0 ? news.slice(0, 1) : [];
+  const rightNews = news.slice(leftNews.length);
   const deepRubrics = new Set(b.deep.map((d) => d.rubric));
   const telegram = b.telegram_digest.slice(0, 2);
   const base = `https://${f.url}`;
@@ -110,6 +136,10 @@ export const FrontPage: FC<{ e: Edition; kindle?: boolean }> = ({ e, kindle }) =
             </div>
           </section>
 
+          {leftNews.map((r) => (
+            <NewsRubric r={r} more={deepRubrics.has(r.name) ? L.morePage2 : undefined} />
+          ))}
+
           {b.sport && (
             <p class="runin" {...fit('sport')}>
               <span class="runin__label">{L.sport}</span>
@@ -163,22 +193,8 @@ export const FrontPage: FC<{ e: Edition; kindle?: boolean }> = ({ e, kindle }) =
         </div>
 
         <div class="col col--right">
-          {news.map((r) => (
-            <section class="rubric" id={slug(r.name)} {...fit('news')}>
-              <span class="label">
-                {r.name}
-                {deepRubrics.has(r.name) && <span class="label__sub">{L.morePage2}</span>}
-              </span>
-              {r.items.map((n) => (
-                <article class="item">
-                  <a class="item__title" href={n.url}>{n.title}</a>
-                  <p class="item__summary">
-                    {n.summary}
-                    <span class="tag">{n.source}</span>
-                  </p>
-                </article>
-              ))}
-            </section>
+          {rightNews.map((r) => (
+            <NewsRubric r={r} more={deepRubrics.has(r.name) ? L.morePage2 : undefined} />
           ))}
           {telegram.length > 0 && (
             <section class="rubric" id={slug(L.telegram)} {...fit('telegram')}>
