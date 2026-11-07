@@ -4,10 +4,12 @@ import type { Lang } from './model';
 import { fakeArchive, fakeEdition, type Variant } from './fake/editions';
 import { renderEdition, type View } from './compose/compose';
 import { ArchivePage } from './web/archive';
+import { probeSources } from './web/probe';
 
-// M0: every route serves fake data (docs/02-plan.md §6, M0). No D1, R2, LLM or collectors yet.
+// M0: every edition route serves fake data (docs/02-plan.md §6, M0). The collectors exist
+// (src/collect/) and are reachable only through the /probe/sources check; no D1, R2 or LLM yet.
 
-type Env = { ASSETS: Fetcher };
+type Env = { ASSETS: Fetcher; PROBE_KEY?: string };
 
 const app = new Hono<{ Bindings: Env }>();
 
@@ -45,6 +47,14 @@ app.get('/today.eink', (c) => {
 app.get('/api/edition', (c) => {
   const o = options(c);
   return c.json(fakeEdition(o.lang, o.variant));
+});
+
+/** Day-1 check: fetch and parse every source from this Worker. Needs the PROBE_KEY secret. */
+app.get('/probe/sources', async (c) => {
+  const key = c.env?.PROBE_KEY;
+  if (!key || c.req.query('key') !== key) return c.notFound();
+  const colo = (c.req.raw as { cf?: { colo?: string } }).cf?.colo;
+  return c.json({ ...(await probeSources()), colo });
 });
 
 app.get('/editions', (c) => c.html(`<!doctype html>${ArchivePage({ lang: options(c).lang, list: fakeArchive() })}`));

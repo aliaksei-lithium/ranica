@@ -4,7 +4,8 @@
 
 **One sentence.** Every morning Ranica composes a one-page personal newspaper from your
 calendar, tasks, weather, chosen news sources and learning goals, written by an AI editor that
-knows your context, and delivers it to your browser, printer, Kindle or e-ink screen.
+knows your context, and is ready as a page in your browser and on your phone, and to print.
+Kindle and e-ink outputs exist in the design and come later (M4).
 
 **Primary user (you).** Lives in a city with real winters, works in software (Java/Kotlin),
 learns German (A2→B1), has hobbies and a sport routine, reads Telegram channels and a few
@@ -93,7 +94,7 @@ step**, **10 browser-minutes per day**, **no outbound email on Free** (Resend in
   step 6  compose: Brief → HTML string, store to R2                    │
   step 7  render: Browser Run session: load HTML → measure/trim →     │
           pdf (A4) → pdf (Kindle size) → png (e-ink) → R2             │
-  step 8  deliveries: Resend email (+Kindle), webhook; record in D1   ─┘
+  step 8  deliveries (M4): Resend email (+Kindle), webhook; record in D1 ─┘
       │
       ▼
  Web Worker (Hono + static assets)
@@ -238,17 +239,43 @@ Each milestone ends with something you can read in the morning.
 - Done when: the printed page looks like the reference photo and you want to read it.
 
 ### M1 — My edition, single user (1–2 weeks)
+Focus: **the page itself** — opened in the browser (home page), on the phone, and printed from the
+print view. Kindle and e-mail delivery stay in the code and design but are not worked on in M1
+(moved to M4).
 - D1 schema + migrations; your user row created by a seed script.
-- Collectors: ICS (Google secret URL), 3–5 RSS feeds, 2–3 Telegram channels, Open-Meteo,
-  `tasks.md` kept in R2 and edited via a tiny `/tasks` page.
-- **Day-1 check**: fetch `t.me/s/<channel>` and the feeds from a deployed Worker (Cloudflare egress
-  IPs) to confirm nothing blocks them; otherwise fall back to Browser Run `/markdown` for Telegram.
+- Collectors: ICS (Google secret URL), the RSS feeds and the Telegram channel from §6.1,
+  Open-Meteo, `tasks.md` kept in R2 and edited via a tiny `/tasks` page.
+- **Day-1 check**: fetch `t.me/s/zerkalo_io` and the feeds from a deployed Worker (Cloudflare egress
+  IPs) with `/probe/sources` to confirm nothing blocks them; otherwise fall back to Browser Run
+  `/markdown` for Telegram.
 - `EditionWorkflow` with one step per source; editor with Claude via AI Gateway; fallback editor.
-- Compose + fit-to-page in one browser session; artifacts to R2.
-- Web: `/today` (set as browser home page), `/editions/<date>`, archive list, behind Cloudflare
-  Access.
-- Delivery: Resend email with PDF → your Kindle address; cron scheduler at your wake time.
-- Done when: you read Ranica for 5 mornings in a row without touching the laptop.
+- Compose + fit-to-page; edition HTML (and the A4 PDF from the browser session) to R2.
+- Web: `/today` (set as browser home page, readable on the phone), `/today?view=print` with a
+  print button, `/editions/<date>`, archive list, behind Cloudflare Access.
+- Cron scheduler at your wake time builds the edition so it is ready when you open the page.
+- Done when: you read Ranica for 5 mornings in a row (browser, phone or paper) without touching
+  the laptop to make it.
+
+### 6.1 Sources for M1
+
+All German-language; the editor writes the page in `en` or `de` and keeps source tags. URLs were
+fetched successfully on 2026-11-07 from a home connection (sizes are one snapshot); the Day-1 check
+repeats this from Cloudflare.
+
+| Id | Source | Feed | Rubric | Snapshot |
+|---|---|---|---|---|
+| `tagesschau-inland` | tagesschau | `https://www.tagesschau.de/inland/index~rss2.xml` | Germany | 49 items, 67 kB |
+| `tagesschau-ausland` | tagesschau | `https://www.tagesschau.de/ausland/index~rss2.xml` | World | 70 items, 95 kB |
+| `tagesspiegel-berlin` | Tagesspiegel | `https://www.tagesspiegel.de/contentexport/feed/berlin` | Berlin | 100 items, 88 kB |
+| `faz-inland` | FAZ | `https://www.faz.net/rss/aktuell/politik/inland/` | Germany | 39 items, 63 kB |
+| `faz-ausland` | FAZ | `https://www.faz.net/rss/aktuell/politik/ausland/` | World | 44 items, 71 kB |
+| `berliner-zeitung` | Berliner Zeitung | `https://www.berliner-zeitung.de/feed.xml` | — (all sections; editor assigns Berlin/Germany/World) | 100 items, 90 kB |
+| `tg-zerkalo` | Telegram @zerkalo_io (Зеркало, Russian) | `https://t.me/s/zerkalo_io` (public web preview, last 20 posts) | Telegram digest | 20 posts, 141 kB HTML |
+
+FAZ's all-news feed (`/rss/aktuell/`, 262 kB, 159 items) is skipped to keep each parse well under
+the 10 ms CPU budget; the two politics sections cover Germany and World. Berliner Zeitung has no
+working section feeds (`/feed`, `/rss`, `/news.rss` are 404 or HTML), so its single feed is used.
+Tech, hobby and other rubrics come later (M2/M3 catalogue).
 
 ### M2 — Learning and personal blocks (1 week)
 - Vocabulary: CSV/Anki import (Python script → CSV → `/import`), `ts-fsrs` scheduling, 5 due cards
@@ -268,6 +295,7 @@ Each milestone ends with something you can read in the morning.
 - Done when: a friend signs up and gets a page the next morning without your help.
 
 ### M4 — More outputs and sources (ongoing)
+- Delivery: Resend e-mail with the PDF → your Kindle address (the `view=kindle` page already exists), delivery records in D1.
 - E-ink endpoint (`/u/<token>/today.png` at device size), TRMNL plugin recipe, Kindle-dashboard mode.
 - Email-to-print, thermal ESC/POS raster, EPUB output.
 - Google Calendar OAuth, Todoist, Gmail "what needs an answer" (after Google verification).
@@ -319,4 +347,6 @@ Each milestone ends with something you can read in the morning.
 3. Add `render/browser.ts` (one session: load → measure → trim → pdf → png) and a local Playwright
    script for fast layout iteration.
 4. Print it and iterate on typography before any collector is written.
-5. From a deployed Worker, fetch `t.me/s/tagesschau` and the chosen feeds once to confirm access.
+5. From a deployed Worker, open `/probe/sources?key=…` to fetch `t.me/s/zerkalo_io` and the §6.1
+   feeds once and confirm Cloudflare egress is not blocked. *(Steps 1–2 and the local Playwright
+   script are done; `src/collect/rss.ts`, `telegram.ts` and the probe route exist.)*

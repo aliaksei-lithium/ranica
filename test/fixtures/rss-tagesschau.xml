@@ -1,0 +1,32 @@
+<?xml version='1.0' encoding='UTF-8'?>
+<rss version="2.0" xmlns:content="http://purl.org/rss/1.0/modules/content/" xmlns:dc="http://purl.org/dc/elements/1.1/">
+  <channel>
+    <title>tagesschau.de - Inland</title>
+    <link>https://www.tagesschau.de/inland</link>
+    <item>
+      <title>Bundestag beschließt neues Gesetz</title>
+      <link>https://www.tagesschau.de/inland/gesetz-100.html</link>
+      <description>Der Bundestag hat am Freitag ein Gesetz beschlossen. Die Opposition kritisiert &quot;Eile&quot; &amp; fehlende Debatte.</description>
+      <pubDate>Sat, 07 Nov 2026 15:57:49 +0100</pubDate>
+      <guid>c89daacc-bbf1-499a-8da1-7652895b4f69</guid>
+      <dc:date>2026-11-07T14:57:49Z</dc:date>
+      <content:encoded><![CDATA[<p> <a href="https://www.tagesschau.de/inland/gesetz-100.html"><img src="https://images.example/x.jpg" alt="Bild" /></a> <br/> <br/>Der Bundestag hat am Freitag ein Gesetz beschlossen.[<a href="https://www.tagesschau.de/inland/gesetz-100.html">mehr</a>]</p>]]></content:encoded>
+    </item>
+    <item>
+      <title>Wetter: Erster Frost im Osten</title>
+      <link>https://www.tagesschau.de/inland/frost-102.html</link>
+      <description>Nachts bis &#8722;4 Grad.</description>
+      <pubDate>Sat, 07 Nov 2026 09:00:00 +0100</pubDate>
+      <guid>0c5a6f1e-0000-4000-8000-000000000002</guid>
+    </item>
+    <item>
+      <title>Doppelte Meldung</title>
+      <link>https://www.tagesschau.de/inland/frost-102.html</link>
+      <guid>0c5a6f1e-0000-4000-8000-000000000002</guid>
+    </item>
+    <item>
+      <title></title>
+      <link>https://www.tagesschau.de/inland/leer.html</link>
+    </item>
+  </channel>
+</rss>

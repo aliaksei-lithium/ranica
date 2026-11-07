@@ -1,0 +1,15 @@
+<rss xmlns:content="http://purl.org/rss/1.0/modules/content/" xmlns:dc="http://purl.org/dc/elements/1.1/" xmlns:media="http://search.yahoo.com/mrss/" version="2.0">
+  <channel>
+    <title>Politik - FAZ.NET</title>
+    <item>
+      <title><![CDATA[Liveblog: Minister „will bald entscheiden“]]></title>
+      <link>https://www.faz.net/aktuell/politik/ausland/liveblog-201657223.html</link>
+      <guid isPermaLink="true">https://www.faz.net/aktuell/politik/ausland/liveblog-201657223.html</guid>
+      <description><![CDATA[Stehen bereit, zu helfen +++ <b>Neue</b> Angebote]]></description>
+      <content:encoded><![CDATA[<img src="https://media0.faz.net/x.webp" /><p>Stehen bereit, zu helfen.</p>]]></content:encoded>
+      <pubDate>Sat, 07 Nov 2026 10:00:37 GMT</pubDate>
+      <dc:creator>Redaktion</dc:creator>
+      <media:thumbnail url="https://media0.faz.net/x.webp" width="400" height="225"/>
+    </item>
+  </channel>
+</rss>

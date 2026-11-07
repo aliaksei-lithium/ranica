@@ -15,7 +15,12 @@ written in TypeScript.
 
 Status: **M0 — Look**. The page design from `design/` rendered by a Hono Worker with **fake data**:
 front page, back page, browser, phone, Kindle and e-ink views in English and German.
-No collectors, database, LLM or deliveries yet (see the roadmap in `docs/02-plan.md` §6).
+Collectors for the M1 sources exist (`src/collect/`: tagesschau, Tagesspiegel, FAZ, Berliner Zeitung
+RSS and the Telegram channel @zerkalo_io) and are used only by the `/probe/sources` check so far;
+no database, LLM or deliveries yet (roadmap: `docs/02-plan.md` §6, sources: §6.1).
+
+Focus for M1 is the page in the browser, on the phone and on paper. The Kindle view stays in the
+code but Kindle/e-mail delivery is postponed to M4.
 
 ## Run it
 
@@ -32,11 +37,12 @@ npm run render     # with dev running: PDFs/PNGs into out/ (needs a global Playw
 | `/today.eink?lang=…` | the e-ink widget |
 | `/editions`, `/editions/<date>` | fake archive |
 | `/api/edition?lang=…` | the facts + Brief JSON behind the page |
+| `/probe/sources?key=…` | Day-1 check: fetches and parses every source from the Worker; 404 unless the `PROBE_KEY` secret is set |
 | `/health` | status |
 
 Code map: `design/` the page design (tokens, `ranica.css`, reference pages) — the single source of the styles,
 copied to `public/css/` by the wrangler build step · `src/fake/` sample data from the reference pages ·
-`src/edit/brief.ts` editor output type · `src/compose/` templates (Hono JSX): `front.tsx`, `back.tsx`, `widget.tsx` ·
+`src/edit/brief.ts` editor output type · `src/collect/` sources list, RSS and Telegram parsers, capped fetch · `src/compose/` templates (Hono JSX): `front.tsx`, `back.tsx`, `widget.tsx` ·
 `public/fit.js` priority-based trimming · `public/app.css` view glue · `scripts/render.mjs` local Playwright render ·
 `scripts/copy-fonts.mjs` self-hosts the OFL fonts (Playfair Display, PT Serif, IBM Plex Sans) in `public/fonts`.
 
@@ -77,6 +83,16 @@ Without a browser (CI, SSH) use an API token instead of `login`:
 Cloudflare Workers Builds (Git integration in the dashboard) works too: production branch `main`,
 build command `npm run typecheck && npm test`, deploy command `npx wrangler deploy`, Worker name
 `ranica`. Use either it or the Deploy workflow, not both.
+
+Day-1 check after the first deploy (are Cloudflare's egress IPs blocked by any source?):
+
+```sh
+npx wrangler secret put PROBE_KEY      # any random string
+curl "https://ranica.<your-subdomain>.workers.dev/probe/sources?key=<that string>"
+```
+
+`ok` should equal `total`; a source with `status` 403/429 or an `error` is blocked from Cloudflare.
+Locally: put `PROBE_KEY=…` in `.dev.vars` and open `http://127.0.0.1:8787/probe/sources?key=…`.
 
 Without the secrets the deploy jobs skip with a notice, CI still runs. The deployed page is public and
 shows fake data; Cloudflare Access goes in front of it in M1 together with real data.

@@ -1,0 +1,14 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<rss xmlns:media="http://search.yahoo.com/mrss/" version="2.0">
+<channel>
+<title>Berliner Zeitung</title>
+<item>
+<guid isPermaLink="false">10573761</guid>
+<title>Filialen schließen: Hunderte Jobs bedroht</title>
+<description>Die Kette schließt rund 60 Filialen.</description>
+<link>https://www.berliner-zeitung.de/article/filialen-10573761</link>
+<pubDate>not a date</pubDate>
+<media:content medium="image" type="image/jpeg" url="https://img.example/a.jpg?w=1024&amp;auto=format" height="683" width="1024"/>
+</item>
+</channel>
+</rss>
