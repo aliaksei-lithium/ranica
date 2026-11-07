@@ -259,8 +259,10 @@ print view. Kindle and e-mail delivery stay in the code and design but are not w
 ### 6.1 Sources for M1
 
 All German-language; the editor writes the page in `en` or `de` and keeps source tags. URLs were
-fetched successfully on 2026-11-07 from a home connection (sizes are one snapshot); the Day-1 check
-repeats this from Cloudflare.
+fetched successfully on 2026-11-07 from a home connection (sizes are one snapshot).
+**Day-1 check passed** on 2026-11-07 from the deployed Worker (`/probe/sources`, colo TXL): 7/7
+sources returned 200 and parsed, 22–284 ms each, none truncated — Cloudflare egress is not blocked,
+so the Browser Run `/markdown` fallback for Telegram is not needed.
 
 | Id | Source | Feed | Rubric | Snapshot |
 |---|---|---|---|---|
@@ -348,5 +350,5 @@ Tech, hobby and other rubrics come later (M2/M3 catalogue).
    script for fast layout iteration.
 4. Print it and iterate on typography before any collector is written.
 5. From a deployed Worker, open `/probe/sources?key=…` to fetch `t.me/s/zerkalo_io` and the §6.1
-   feeds once and confirm Cloudflare egress is not blocked. *(Steps 1–2 and the local Playwright
+   feeds once and confirm Cloudflare egress is not blocked. **Done 2026-11-07: 7/7 OK.** *(Steps 1–2 and the local Playwright
    script are done; `src/collect/rss.ts`, `telegram.ts` and the probe route exist.)*
