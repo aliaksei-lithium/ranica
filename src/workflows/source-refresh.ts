@@ -1,4 +1,4 @@
-// SourceRefreshWorkflow (docs/02-plan.md §3): hourly via `schedules` in wrangler.jsonc.
+// SourceRefreshWorkflow (docs/02-plan.md §3): started hourly by the Cron Trigger in src/index.ts.
 // One step per source so each stays under the 10 ms CPU budget and retries on its own;
 // a source that still fails after its retries is reported and the others continue.
 import { WorkflowEntrypoint, type WorkflowEvent, type WorkflowStep } from 'cloudflare:workers';

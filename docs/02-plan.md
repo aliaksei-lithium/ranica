@@ -246,7 +246,7 @@ Focus: **the page itself** — opened in the browser (home page), on the phone, 
 print view. Kindle and e-mail delivery stay in the code and design but are not worked on in M1
 (moved to M4).
 - D1 schema + migrations; your user row created by a seed script. *(Done: `migrations/0001_init.sql`,
-  `seed/me.sql`, `SourceRefreshWorkflow` hourly via Workflow `schedules`, `/admin/refresh`.)*
+  `seed/me.sql`, `SourceRefreshWorkflow` started by an hourly Cron Trigger (Workflow `schedules` need the paid plan), `/admin/refresh`.)*
 - Collectors: ICS (Google secret URL), the RSS feeds and the Telegram channel from §6.1,
   Open-Meteo, `tasks.md` kept in R2 and edited via a tiny `/tasks` page.
 - **Day-1 check**: fetch `t.me/s/zerkalo_io` and the feeds from a deployed Worker (Cloudflare egress

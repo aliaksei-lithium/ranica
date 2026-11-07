@@ -14,7 +14,7 @@ export { SourceRefreshWorkflow } from './workflows/source-refresh';
 // Edition routes still serve fake data (docs/02-plan.md §6, M0). Since M1 the hourly
 // SourceRefreshWorkflow fills D1 with items; /admin/* shows and triggers it.
 
-const app = new Hono<{ Bindings: Env }>();
+export const app = new Hono<{ Bindings: Env }>();
 
 /** Routes for the operator only: 404 unless the PROBE_KEY secret is set and passed as ?key=…. */
 const authorized = (c: Context<{ Bindings: Env }>) => {
@@ -98,4 +98,15 @@ app.get('/editions/:date{\\d{4}-\\d{2}-\\d{2}}', (c) => {
   return c.html(renderEdition({ ...e, facts: { ...e.facts, issue } }, o.view, o));
 });
 
-export default app;
+/** Cron Trigger (wrangler.jsonc `triggers.crons`): start the hourly source refresh.
+ *  A Workflow `schedules` entry would do the same but needs the paid Workers plan. */
+const scheduled: ExportedHandlerScheduledHandler<Env> = async (controller, _env, ctx) => {
+  if (controller.cron === REFRESH_CRON) {
+    const instance = await ctx.exports.SourceRefreshWorkflow.create({ params: {} });
+    console.log(`source-refresh started: ${instance.id}`);
+  }
+};
+
+export const REFRESH_CRON = '0 * * * *';
+
+export default { fetch: app.fetch, scheduled } satisfies ExportedHandler<Env>;

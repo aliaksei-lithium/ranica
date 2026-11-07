@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import app from '../src/index';
+import { app } from '../src/index';
 
 const get = async (path: string) => {
   const res = await app.request(path);

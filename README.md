@@ -107,7 +107,7 @@ Locally: put `PROBE_KEY=…` in `.dev.vars` and open `http://127.0.0.1:8787/prob
 npx wrangler d1 create ranica          # copy the printed database_id into wrangler.jsonc
 npm run db:migrate:remote
 npm run db:seed:remote
-npm run deploy                          # also registers the hourly source-refresh Workflow
+npm run deploy                          # also registers the Workflow and the hourly cron
 curl -X POST "https://ranica.<your-subdomain>.workers.dev/admin/refresh?key=<PROBE_KEY>"
 ```
 

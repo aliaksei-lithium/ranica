@@ -4,7 +4,7 @@ import { parseTelegram } from '../src/collect/telegram';
 import { MAX_BYTES, fetchCapped } from '../src/collect/fetch';
 import { clip, decodeEntities, hash, htmlToText } from '../src/collect/text';
 import { SOURCES } from '../src/collect/sources';
-import app from '../src/index';
+import { app } from '../src/index';
 import tagesschauXml from './fixtures/rss-tagesschau.xml?raw';
 import fazXml from './fixtures/rss-faz.xml?raw';
 import bzXml from './fixtures/rss-berliner-zeitung.xml?raw';

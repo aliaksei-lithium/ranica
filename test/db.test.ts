@@ -1,5 +1,5 @@
 import { env, exports } from 'cloudflare:workers';
-import { introspectWorkflow } from 'cloudflare:test';
+import { createExecutionContext, createScheduledController, introspectWorkflow, waitOnExecutionContext } from 'cloudflare:test';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { SOURCES, type Source } from '../src/collect/sources';
 import { refreshSource } from '../src/collect/refresh';
@@ -8,6 +8,7 @@ import {
   insertItems, itemsForUser, pruneItems, recordFetch, retentionCutoff, sourceStatus, subscribeAllUsers, syncSources,
 } from '../src/db/queries';
 import type { RefreshOutput } from '../src/workflows/source-refresh';
+import worker, { REFRESH_CRON } from '../src/index';
 import tagesschauXml from './fixtures/rss-tagesschau.xml?raw';
 import telegramHtml from './fixtures/telegram-zerkalo.html?raw';
 
@@ -159,5 +160,18 @@ describe('SourceRefreshWorkflow', () => {
     const status = await (await exports.default.fetch('https://ranica.test/admin/sources?key=test-key')).json<{ id: string; items: number; lastError: string | null }[]>();
     expect(status.find((s) => s.id === 'faz-inland')!.lastError).toContain('connect timeout');
     expect(status.filter((s) => s.items > 0)).toHaveLength(SOURCES.length - 1);
+  });
+});
+
+describe('hourly cron', () => {
+  it('starts a SourceRefreshWorkflow run', async () => {
+    stubFeeds();
+    await using wf = await introspectWorkflow(env.SOURCE_REFRESH);
+    const ctx = createExecutionContext();
+    await worker.scheduled(createScheduledController({ cron: REFRESH_CRON, scheduledTime: NOW }), env, ctx);
+    await waitOnExecutionContext(ctx);
+    const [instance] = await wf.get();
+    await instance!.waitForStatus('complete');
+    expect(((await instance!.getOutput()) as RefreshOutput).results).toHaveLength(SOURCES.length);
   });
 });

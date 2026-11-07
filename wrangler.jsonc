@@ -27,9 +27,11 @@
     }
   ],
   "exports": {
-    // Hourly: one step per source → D1 items (docs/02-plan.md §3). Started by hand with POST /admin/refresh.
-    "SourceRefreshWorkflow": { "type": "workflow", "name": "source-refresh", "schedules": ["0 * * * *"] }
-  }
+    // One step per source → D1 items (docs/02-plan.md §3). Started by the hourly cron below
+    // (Workflow `schedules` need the paid plan) or by hand with POST /admin/refresh.
+    "SourceRefreshWorkflow": { "type": "workflow", "name": "source-refresh" }
+  },
+  "triggers": { "crons": ["0 * * * *"] } // must match REFRESH_CRON in src/index.ts
 
   // Later in M1:
   // "r2_buckets": [{ "binding": "EDITIONS", "bucket_name": "ranica-editions" }],
@@ -38,5 +40,5 @@
   // "workflows": [
   //   { "name": "edition", "binding": "EDITION_WORKFLOW", "class_name": "EditionWorkflow" },
   // ],
-  // "triggers": { "crons": ["*/15 * * * *"] }
+  // edition scheduler: add "*/15 * * * *" to triggers.crons
 }
