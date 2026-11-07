@@ -15,9 +15,10 @@ written in TypeScript.
 
 Status: **M0 — Look**. The page design from `design/` rendered by a Hono Worker with **fake data**:
 front page, back page, browser, phone, Kindle and e-ink views in English and German.
-Collectors for the M1 sources exist (`src/collect/`: tagesschau, Tagesspiegel, FAZ, Berliner Zeitung
-RSS and the Telegram channel @zerkalo_io) and are used only by the `/probe/sources` check so far;
-no database, LLM or deliveries yet (roadmap: `docs/02-plan.md` §6, sources: §6.1).
+M1 in progress: the D1 schema (`migrations/`) and an hourly `SourceRefreshWorkflow` that fetches the
+M1 sources (tagesschau, Tagesspiegel, FAZ, Berliner Zeitung RSS and the Telegram channel @zerkalo_io)
+into D1, one step per source. The edition pages still show fake data; no LLM or deliveries yet
+(roadmap: `docs/02-plan.md` §6, sources: §6.1).
 
 Focus for M1 is the page in the browser, on the phone and on paper. The Kindle view stays in the
 code but Kindle/e-mail delivery is postponed to M4.
@@ -27,7 +28,8 @@ code but Kindle/e-mail delivery is postponed to M4.
 ```sh
 npm install
 npm run dev        # wrangler dev → http://127.0.0.1:8787/today
-npm test           # route tests (vitest)
+npm run db:migrate && npm run db:seed   # once: local D1 schema + your reader row
+npm test           # vitest inside workerd (local D1, Workflows)
 npm run render     # with dev running: PDFs/PNGs into out/ (needs a global Playwright + Chromium)
 ```
 
@@ -38,11 +40,16 @@ npm run render     # with dev running: PDFs/PNGs into out/ (needs a global Playw
 | `/editions`, `/editions/<date>` | fake archive |
 | `/api/edition?lang=…` | the facts + Brief JSON behind the page |
 | `/probe/sources?key=…` | Day-1 check: fetches and parses every source from the Worker; 404 unless the `PROBE_KEY` secret is set |
+| `POST /admin/refresh?key=…` | start a `SourceRefreshWorkflow` run now (it also runs hourly); returns the instance id |
+| `/admin/refresh/<id>?key=…` | status and output of that run (per source: HTTP status, parsed, inserted, error) |
+| `/admin/sources?key=…` | per source: last fetch, last error, items stored, newest item |
 | `/health` | status |
 
 Code map: `design/` the page design (tokens, `ranica.css`, reference pages) — the single source of the styles,
 copied to `public/css/` by the wrangler build step · `src/fake/` sample data from the reference pages ·
-`src/edit/brief.ts` editor output type · `src/collect/` sources list, RSS and Telegram parsers, capped fetch · `src/compose/` templates (Hono JSX): `front.tsx`, `back.tsx`, `widget.tsx` ·
+`src/edit/brief.ts` editor output type · `src/collect/` sources list, RSS and Telegram parsers, capped fetch,
+`refresh.ts` (one source → D1) · `src/db/queries.ts` typed D1 queries · `src/workflows/source-refresh.ts` ·
+`migrations/` D1 schema · `seed/me.sql` the single M1 reader · `src/compose/` templates (Hono JSX): `front.tsx`, `back.tsx`, `widget.tsx` ·
 `public/fit.js` priority-based trimming · `public/app.css` view glue · `scripts/render.mjs` local Playwright render ·
 `scripts/copy-fonts.mjs` self-hosts the OFL fonts (Playfair Display, PT Serif, IBM Plex Sans) in `public/fonts`.
 
@@ -93,6 +100,19 @@ curl "https://ranica.<your-subdomain>.workers.dev/probe/sources?key=<that string
 
 `ok` should equal `total`; a source with `status` 403/429 or an `error` is blocked from Cloudflare.
 Locally: put `PROBE_KEY=…` in `.dev.vars` and open `http://127.0.0.1:8787/probe/sources?key=…`.
+
+### Database (once, before the first deploy with D1)
+
+```sh
+npx wrangler d1 create ranica          # copy the printed database_id into wrangler.jsonc
+npm run db:migrate:remote
+npm run db:seed:remote
+npm run deploy                          # also registers the hourly source-refresh Workflow
+curl -X POST "https://ranica.<your-subdomain>.workers.dev/admin/refresh?key=<PROBE_KEY>"
+```
+
+New migrations: add `migrations/000N_*.sql`, run `npm run db:migrate` locally and
+`npm run db:migrate:remote` before deploying code that needs them.
 
 Without the secrets the deploy jobs skip with a notice, CI still runs. The deployed page is public and
 shows fake data; Cloudflare Access goes in front of it in M1 together with real data.

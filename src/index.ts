@@ -5,13 +5,25 @@ import { fakeArchive, fakeEdition, type Variant } from './fake/editions';
 import { renderEdition, type View } from './compose/compose';
 import { ArchivePage } from './web/archive';
 import { probeSources } from './web/probe';
+import type { Env } from './env';
+import { sourceStatus } from './db/queries';
+import type { RefreshParams } from './workflows/source-refresh';
 
-// M0: every edition route serves fake data (docs/02-plan.md §6, M0). The collectors exist
-// (src/collect/) and are reachable only through the /probe/sources check; no D1, R2 or LLM yet.
+export { SourceRefreshWorkflow } from './workflows/source-refresh';
 
-type Env = { ASSETS: Fetcher; PROBE_KEY?: string };
+// Edition routes still serve fake data (docs/02-plan.md §6, M0). Since M1 the hourly
+// SourceRefreshWorkflow fills D1 with items; /admin/* shows and triggers it.
 
 const app = new Hono<{ Bindings: Env }>();
+
+/** Routes for the operator only: 404 unless the PROBE_KEY secret is set and passed as ?key=…. */
+const authorized = (c: Context<{ Bindings: Env }>) => {
+  const key = c.env?.PROBE_KEY;
+  return !!key && c.req.query('key') === key;
+};
+
+/** ctx.exports.SourceRefreshWorkflow (declared under `exports` in wrangler.jsonc). */
+const refreshWorkflow = (c: Context<{ Bindings: Env }>): Workflow<RefreshParams> => c.executionCtx.exports.SourceRefreshWorkflow;
 
 const pick = <T extends string>(value: string | undefined, allowed: readonly T[], fallback: T): T =>
   allowed.includes(value as T) ? (value as T) : fallback;
@@ -29,7 +41,7 @@ function options(c: Context) {
 
 app.get('/', (c) => c.redirect('/today'));
 
-app.get('/health', (c) => c.json({ ok: true, milestone: 'M0', data: 'fake' }));
+app.get('/health', (c) => c.json({ ok: true, milestone: 'M1', data: 'fake editions, live items' }));
 
 /** The edition: ?lang=en|de &day=full|thin &view=web|print|kindle|eink &pages=1|2 */
 app.get('/today', (c) => {
@@ -51,10 +63,28 @@ app.get('/api/edition', (c) => {
 
 /** Day-1 check: fetch and parse every source from this Worker. Needs the PROBE_KEY secret. */
 app.get('/probe/sources', async (c) => {
-  const key = c.env?.PROBE_KEY;
-  if (!key || c.req.query('key') !== key) return c.notFound();
+  if (!authorized(c)) return c.notFound();
   const colo = (c.req.raw as { cf?: { colo?: string } }).cf?.colo;
   return c.json({ ...(await probeSources()), colo });
+});
+
+/** What the refresh Workflow stored: per source last fetch, status, error, item count. */
+app.get('/admin/sources', async (c) => {
+  if (!authorized(c)) return c.notFound();
+  return c.json(await sourceStatus(c.env.DB));
+});
+
+/** Start a SourceRefreshWorkflow run now (it also runs hourly). */
+app.post('/admin/refresh', async (c) => {
+  if (!authorized(c)) return c.notFound();
+  const instance = await refreshWorkflow(c).create({ params: {} });
+  return c.json({ id: instance.id, status: await instance.status() }, 202);
+});
+
+app.get('/admin/refresh/:id', async (c) => {
+  if (!authorized(c)) return c.notFound();
+  const instance = await refreshWorkflow(c).get(c.req.param('id'));
+  return c.json(await instance.status());
 });
 
 app.get('/editions', (c) => c.html(`<!doctype html>${ArchivePage({ lang: options(c).lang, list: fakeArchive() })}`));

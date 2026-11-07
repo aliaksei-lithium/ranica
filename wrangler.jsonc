@@ -1,7 +1,7 @@
 {
   // Ranica — single Worker (see docs/02-plan.md §3).
-  // M0: only static assets + the Hono app with fake data. Other bindings are listed
-  // as comments and get enabled in M1 when the real pipeline is built.
+  // Static assets + the Hono app, D1 and the source refresh Workflow (M1). Other bindings are
+  // listed as comments and get enabled as the pipeline grows.
   "$schema": "node_modules/wrangler/config-schema.json",
   "name": "ranica",
   "main": "src/index.ts",
@@ -14,16 +14,29 @@
     "directory": "./public",
     "binding": "ASSETS"
   },
-  "observability": { "enabled": true }
+  "observability": { "enabled": true },
 
-  // M1:
-  // "d1_databases": [{ "binding": "DB", "database_name": "ranica", "database_id": "<id>" }],
+  // M1
+  "d1_databases": [
+    {
+      "binding": "DB",
+      "database_name": "ranica",
+      // Created 2026-11-07 with `wrangler d1 create ranica --location weur`.
+      "database_id": "0f67fae2-2555-458d-b5f9-4079a1801994",
+      "migrations_dir": "migrations"
+    }
+  ],
+  "exports": {
+    // Hourly: one step per source → D1 items (docs/02-plan.md §3). Started by hand with POST /admin/refresh.
+    "SourceRefreshWorkflow": { "type": "workflow", "name": "source-refresh", "schedules": ["0 * * * *"] }
+  }
+
+  // Later in M1:
   // "r2_buckets": [{ "binding": "EDITIONS", "bucket_name": "ranica-editions" }],
   // "browser": { "binding": "BROWSER" },
   // "ai": { "binding": "AI" },
   // "workflows": [
   //   { "name": "edition", "binding": "EDITION_WORKFLOW", "class_name": "EditionWorkflow" },
-  //   { "name": "source-refresh", "binding": "SOURCE_REFRESH", "class_name": "SourceRefreshWorkflow" }
   // ],
-  // "triggers": { "crons": ["*/15 * * * *", "0 * * * *"] }
+  // "triggers": { "crons": ["*/15 * * * *"] }
 }

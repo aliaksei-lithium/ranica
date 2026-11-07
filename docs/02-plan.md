@@ -163,16 +163,19 @@ The last four fields fill the back page (design/pages/back-page-*.html); the Typ
 |---|---|
 | `user` | id, email, locale (`en`/`de`), learner_level, timezone, city, lat, lon, wake_time, plan, kindle_email, created_at |
 | `profile` | user_id, context_md, hobbies_json, sport_rules_json, countdowns_json |
-| `source` | id, kind (`rss`/`telegram`/`gnews_query`/`ics`/`todoist`/`md_tasks`), config_json (encrypted for private kinds), shared (0/1), etag, last_fetch_at, last_error |
+| `source` | id, kind (`rss`/`telegram`/`gnews_query`/`ics`/`todoist`/`md_tasks`), name, config_json (encrypted for private kinds), shared (0/1), active, etag, last_modified, last_fetch_at, last_ok_at, last_status, last_error |
 | `subscription` | user_id, source_id, rubric, weight |
-| `item` | id, source_id, external_id, url, title, body (≤ 2 kB), published_at, fetched_at, hash — unique (source_id, hash) |
+| `item` | id, source_id, external_id, url, title, body (≤ 2 kB), link (Telegram: announced article), published_at, fetched_at, hash — unique (source_id, hash) |
 | `vocab_card` | id, user_id, de, en, example, fsrs_json, due_at, created_from_item_id |
 | `review` | card_id, reviewed_at, rating, mode (`paper`/`web`) |
-| `edition` | id, user_id, date, status, brief_json, r2_prefix, tokens_in, tokens_out, cost_cents, browser_ms, generated_at — unique (user_id, date) |
+| `edition` | id, user_id, date, issue, status, facts_json, brief_json, error, r2_prefix, tokens_in, tokens_out, cost_cents, browser_ms, generated_at — unique (user_id, date) |
 | `delivery` | edition_id, channel, target, status, error, sent_at |
 | `session` | only if Cloudflare Access is not used; otherwise none |
 
-Retention: items 7 days, editions 90 days (R2 objects deleted by a lifecycle rule), reviews forever.
+Schema: `migrations/0001_init.sql`. Shared sources are synced from `src/collect/sources.ts` by the
+refresh Workflow (unchanged rows are not rewritten); the M1 reader comes from `seed/me.sql`.
+
+Retention: items 7 days (by publication date, else fetch date; older items are not inserted), editions 90 days (R2 objects deleted by a lifecycle rule), reviews forever.
 Write budget check for 100 users: 50 shared sources × 24 refreshes × ~5 new items = 6 k item
 rows + 100 editions + ~300 deliveries + reviews ≈ 7 k writes/day of the 100 k allowed.
 
@@ -242,7 +245,8 @@ Each milestone ends with something you can read in the morning.
 Focus: **the page itself** — opened in the browser (home page), on the phone, and printed from the
 print view. Kindle and e-mail delivery stay in the code and design but are not worked on in M1
 (moved to M4).
-- D1 schema + migrations; your user row created by a seed script.
+- D1 schema + migrations; your user row created by a seed script. *(Done: `migrations/0001_init.sql`,
+  `seed/me.sql`, `SourceRefreshWorkflow` hourly via Workflow `schedules`, `/admin/refresh`.)*
 - Collectors: ICS (Google secret URL), the RSS feeds and the Telegram channel from §6.1,
   Open-Meteo, `tasks.md` kept in R2 and edited via a tiny `/tasks` page.
 - **Day-1 check**: fetch `t.me/s/zerkalo_io` and the feeds from a deployed Worker (Cloudflare egress
