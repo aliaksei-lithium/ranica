@@ -16,7 +16,7 @@ export const BriefSchema = z.object({
   weather_note: z.string().describe('One practical line (at most 120 characters) based only on the weather facts; empty if none'),
   agenda: z.array(z.object({ event_id: z.string(), note: z.string() })).describe('Notes for calendar events; empty when there are no events'),
   tasks: z.array(z.object({ task_id: z.string(), context: z.string() })).describe('Context for tasks; empty when there are no tasks'),
-  news: z.array(newsPick).describe('Front page: up to 3 rubrics with 2-4 items each, most important first'),
+  news: z.array(newsPick).describe('Front page: up to 3 rubrics with 2-3 items each, most important first; title at most 70 characters, summary one sentence of at most 140 characters'),
   telegram_digest: z
     .array(z.object({
       channel: z.string().describe('Channel as given, e.g. "@zerkalo_io"'),

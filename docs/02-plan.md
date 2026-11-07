@@ -131,7 +131,7 @@ Unchanged: a stable, cached system prompt (role, language rules, B1 rules, JSON 
 invent") and a volatile user message (profile context, date, weather facts, events, tasks,
 items[], vocab_due[], hobby topics, sport rule result). Output uses Anthropic structured outputs
 with the schema below; any `item_id`/`event_id`/`card_id` not present in the input is dropped.
-Model: `claude-opus-5-5` through AI Gateway (`https://gateway.ai.cloudflare.com/v1/<acct>/<gw>/anthropic`),
+Model: `claude-sonnet-5-5` (changed from Opus 5.5 on 2026-11-07 for cost; `EDITOR_MODEL` var, `claude-haiku-5-5` is the cheapest option) through AI Gateway (`https://gateway.ai.cloudflare.com/v1/<acct>/<gw>/anthropic`),
 `output_config.effort: "medium"`, `fallbacks: "default"`. Fallback chain: retry once → Workers AI
 (`@cf/meta/llama-3.3-70b-instruct-fp8-fast`, JSON mode) → no-LLM Brief (facts only).
 
@@ -193,7 +193,7 @@ rows + 100 editions + ~300 deliveries + reviews ≈ 7 k writes/day of the 100 k 
 | ICS | `ical.js` or `node-ical` (nodejs_compat) | Recurrence expansion; cap at 60 days window to keep CPU low |
 | Telegram | `fetch` + `HTMLRewriter` (built into Workers, streaming, ~0 CPU) | Parse `t.me/s/<channel>` without loading a DOM |
 | Weather | Open-Meteo JSON | No key |
-| LLM | **Anthropic TypeScript SDK** (`@anthropic-ai/sdk`) with `baseURL` set to **AI Gateway**; model `claude-opus-5-5`; structured outputs | Quality for selection and B1 German; gateway gives logs, caching, rate limits for free |
+| LLM | **Anthropic TypeScript SDK** (`@anthropic-ai/sdk`) with `baseURL` set to **AI Gateway**; model `claude-sonnet-5-5` (`EDITOR_MODEL` var); structured outputs | Quality for selection and B1 German; gateway gives logs, caching, rate limits for free |
 | Free LLM fallback | **Workers AI** Llama 3.3 70B (JSON mode) | ~7 editions/day inside the 10 k neurons |
 | Spaced repetition | `ts-fsrs` (FSRS-6, TypeScript, used by many Anki-like apps) | Same algorithm as the earlier Kotlin choice |
 | Email (+Kindle) | **Resend** HTTP API, sending domain on Cloudflare DNS; PDF as attachment | Free tier ≈ 100/day; Cloudflare's own sending needs Workers Paid |
@@ -253,7 +253,7 @@ print view. Kindle and e-mail delivery stay in the code and design but are not w
   IPs) with `/probe/sources` to confirm nothing blocks them; otherwise fall back to Browser Run
   `/markdown` for Telegram.
 - `EditionWorkflow` with one step per source; editor with Claude via AI Gateway; fallback editor.
-  *(Done 2026-11-07: `EditionWorkflow` load → weather → editor → store; Claude Opus 5.5 with structured
+  *(Done 2026-11-07: `EditionWorkflow` load → weather → editor → store; Claude Sonnet 5.5 with structured
   output (zod schema), effort `medium`, server-side refusal fallbacks (`fallbacks: "default"`), id
   validation; no-LLM fallback editor when there is no key or Claude fails; AI Gateway via the
   optional `AI_GATEWAY_URL` var. The Workers AI middle step is not built. No prompt caching: one
@@ -346,7 +346,7 @@ Tech, hobby and other rubrics come later (M2/M3 catalogue).
 ## 9. Decisions still open (defaults chosen, change if you disagree)
 1. **Auth** — Cloudflare Access by default (zero code); own magic links via Resend if Access's
    free user cap or UX gets in the way.
-2. **LLM** — Claude Opus 5.5 via AI Gateway by default (≈ $4/month for one user); Workers AI
+2. **LLM** — Claude Sonnet 5.5 by default (≈ 7 cents per edition, ≈ $2/month for one user; Opus 5.5 measured 15 cents); Workers AI
    Llama for a fully free mode with lower German quality.
 3. **Kindle format** — device-sized PDF by default; EPUB later.
 4. **Edition name on the masthead** — "Ranica" plus the user's own title.

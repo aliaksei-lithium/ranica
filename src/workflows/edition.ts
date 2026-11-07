@@ -64,7 +64,7 @@ export class EditionWorkflow extends WorkflowEntrypoint<Env, EditionParams> {
       try {
         edited = await step.do('editor', { retries: { limit: 1, delay: '1 minute' }, timeout: '10 minutes' }, async () => {
           try {
-            return { ...(await runEditor(input, { apiKey: this.env.ANTHROPIC_API_KEY!, gatewayUrl: this.env.AI_GATEWAY_URL })), error: null };
+            return { ...(await runEditor(input, { apiKey: this.env.ANTHROPIC_API_KEY!, model: this.env.EDITOR_MODEL, gatewayUrl: this.env.AI_GATEWAY_URL })), error: null };
           } catch (e) {
             // A refusal (after the server-side fallback) will not change on retry.
             if (e instanceof EditorRefusal) return { error: e.message };

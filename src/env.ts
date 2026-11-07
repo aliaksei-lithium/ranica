@@ -7,6 +7,8 @@ export interface Env {
   PROBE_KEY?: string;
   /** Secret: Claude editor. Without it editions use the no-LLM fallback editor. */
   ANTHROPIC_API_KEY?: string;
+  /** Var: Claude model for the editor; default claude-sonnet-5-5 (src/edit/editor.ts). */
+  EDITOR_MODEL?: string;
   /** Var: https://gateway.ai.cloudflare.com/v1/<account>/<gateway>/anthropic; unset = direct to Anthropic. */
   AI_GATEWAY_URL?: string;
   /** Var: public address of the web edition without scheme, printed in the footer and the QR codes. */

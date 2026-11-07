@@ -35,7 +35,9 @@
     "EditionWorkflow": { "type": "workflow", "name": "edition" }
   },
   "vars": {
-    "PUBLIC_URL": "ranica.aliaksei-zhynhiarouski.workers.dev/today"
+    "PUBLIC_URL": "ranica.aliaksei-zhynhiarouski.workers.dev/today",
+    // Editor model: claude-sonnet-5-5 (default), claude-haiku-5-5 (cheapest) or claude-opus-5-5.
+    "EDITOR_MODEL": "claude-sonnet-5-5"
     // "AI_GATEWAY_URL": "https://gateway.ai.cloudflare.com/v1/<account id>/<gateway>/anthropic"
   },
   // Secrets (wrangler secret put): PROBE_KEY, ANTHROPIC_API_KEY.

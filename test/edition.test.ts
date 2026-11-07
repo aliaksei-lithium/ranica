@@ -180,12 +180,27 @@ describe('Claude editor', () => {
       return Response.json(anthropicResponse(brief()));
     }) as typeof fetch;
     const r = await runEditor(input, { apiKey: 'sk-test', gatewayUrl: 'https://gateway.example/anthropic', fetch: fetcher });
-    expect(sent).toMatchObject({ model: 'claude-opus-5-5', fallbacks: 'default', output_config: { effort: 'medium', format: { type: 'json_schema' } } });
+    expect(sent).toMatchObject({ model: 'claude-sonnet-5-5', fallbacks: 'default', output_config: { effort: 'medium', format: { type: 'json_schema' } } });
     expect(headers.get('anthropic-beta')).toContain('server-side-fallback-2026-07-01');
     expect(String(sent.system)).toContain('Use only ids that appear in the input');
     expect(r.brief.headline).toBe('A calm Saturday');
     expect(r.brief.on_this_day).toEqual({ text: 'Morgenstund hat Gold im Mund.', author: 'Sprichwort' });
-    expect(r).toMatchObject({ model: EDITOR_MODEL, tokensIn: 9000, tokensOut: 3000, costCents: 9.6 });
+    expect(r).toMatchObject({ model: EDITOR_MODEL, tokensIn: 9000, tokensOut: 3000, costCents: 4.8 });
+  });
+
+  it('Haiku: no server-side fallbacks, Haiku prices', async () => {
+    let sent: Record<string, unknown> = {};
+    let headers = new Headers();
+    const fetcher = (async (_url: string | URL | Request, init?: RequestInit) => {
+      sent = JSON.parse(String(init!.body));
+      headers = new Headers(init!.headers);
+      return Response.json(anthropicResponse(brief(), { model: 'claude-haiku-5-5' }));
+    }) as typeof fetch;
+    const r = await runEditor(input, { apiKey: 'sk-test', model: 'claude-haiku-5-5', fetch: fetcher });
+    expect(sent.model).toBe('claude-haiku-5-5');
+    expect(sent).not.toHaveProperty('fallbacks');
+    expect(headers.get('anthropic-beta') ?? '').not.toContain('server-side-fallback');
+    expect(r.costCents).toBe(0.24);
   });
 
   it('turns a refusal into EditorRefusal', async () => {
@@ -270,4 +285,34 @@ describe('EditionWorkflow', () => {
 
 it('the fake edition still renders without a database', async () => {
   expect(await (await app.request('/today')).text()).toContain('leave by 12:20');
+});
+
+describe('front page layout', () => {
+  it('caps front rubrics at 3 items; back rubrics at 4', () => {
+    const known = { items: new Set(['n1', 'n2', 'n3', 'n4', 'n5', 'n6']), events: new Set<string>(), tasks: new Set<string>(), cards: new Set<string>(), channels: new Set<string>() };
+    const four = ['n1', 'n2', 'n3', 'n4'].map((id) => ({ rubric: 'Germany', item_id: id, title: id, summary: '' }));
+    const { brief: b, dropped } = validateBrief(brief({ news: four, back_news: [] }), known);
+    expect(b.news.map((n) => n.item_id)).toEqual(['n1', 'n2', 'n3']);
+    expect(dropped).toContain('over limit n4');
+  });
+
+  it('without events and tasks the first rubric goes to the left column; 3rd+ items are trimmable', async () => {
+    const { renderEdition } = await import('../src/compose/compose');
+    const facts = buildFacts({ reader, date: DATE, issue: 1, generatedAt: '06:00', items, weather: null, publicUrl: 'x/today' });
+    const b = brief({ news: [
+      { rubric: 'Germany', item_id: 'n1', title: 'G1', summary: '' },
+      { rubric: 'Berlin', item_id: 'n2', title: 'B1', summary: '' },
+      { rubric: 'Berlin', item_id: 'n4', title: 'B2', summary: '' },
+      { rubric: 'Berlin', item_id: 'n5', title: 'B3', summary: '' },
+    ] });
+    const html = renderEdition({ facts, brief: b }, 'print', { backPage: false });
+    const left = html.slice(html.indexOf('col col--left'), html.indexOf('col col--right'));
+    expect(left).toContain('id="germany"');
+    expect(left).not.toContain('id="berlin"');
+    expect(html.match(/data-block="newsextra"/g)).toHaveLength(1);
+
+    const withEvents = renderEdition({ facts: { ...facts, events: [{ id: 'e1', time: '09:00', title: 'Standup' }] }, brief: b }, 'print', { backPage: false });
+    const left2 = withEvents.slice(withEvents.indexOf('col col--left'), withEvents.indexOf('col col--right'));
+    expect(left2).not.toContain('id="germany"');
+  });
 });

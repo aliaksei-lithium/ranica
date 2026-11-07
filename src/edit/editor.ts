@@ -7,7 +7,18 @@ import type { Brief } from './brief';
 import { BriefSchema, toBrief } from './schema';
 import type { EditorInput } from '../edition/facts';
 
-export const EDITOR_MODEL = 'claude-opus-5-5';
+/** Default editor model; override with the EDITOR_MODEL var (e.g. claude-haiku-5-5 for the cheapest run). */
+export const EDITOR_MODEL = 'claude-sonnet-5-5';
+
+/** List prices in $ per million tokens: input, output, cache read. Unknown models are costed as Opus. */
+const PRICES: Record<string, [number, number, number]> = {
+  'claude-opus-5-5': [4, 20, 0.2],
+  'claude-sonnet-5-5': [2, 10, 0.2],
+  'claude-haiku-5-5': [0.1, 0.5, 0.01],
+};
+
+/** Models that accept server-side refusal fallbacks (`fallbacks: "default"`); Haiku has none. */
+const SERVER_FALLBACKS = new Set(['claude-opus-5-5', 'claude-sonnet-5-5', 'claude-fable-5-1']);
 
 export const SYSTEM_PROMPT = `You are the editor of Ranica, a one-page personal morning newspaper printed for a single reader.
 You receive today's facts (date, weather, calendar, tasks) and news items collected overnight, and you return the page content as JSON.
@@ -20,7 +31,7 @@ What makes a good page:
 
 Rules:
 - Use only ids that appear in the input (items "n…", events "e…", tasks "t…", cards "c…"). Do not invent ids or events.
-- news (front page): up to 3 rubrics, normally Berlin, Germany and World (in German: Berlin, Deutschland, Welt), 2-4 items each, the most important rubric and item first.
+- news (front page): up to 3 rubrics, normally Berlin, Germany and World (in German: Berlin, Deutschland, Welt), 2-3 items each, the most important rubric and item first. The front page is one printed A4 sheet: a title of at most 70 characters and a one-sentence summary of at most 140 characters per item. More detail belongs in deep and back_news.
 - deep (back page): 3-4 longer summaries of the most important front-page items, written from the item text only.
 - back_news (back page): items not on the front page, 1-2 rubrics.
 - headline: the day in a few words, not clickbait.
@@ -41,9 +52,10 @@ export interface EditorResult {
 
 export class EditorRefusal extends Error {}
 
-/** Opus 5.5 list prices: $4 / $20 per million tokens (cache reads $0.20). */
-const cost = (u: { input_tokens: number; output_tokens: number; cache_read_input_tokens?: number | null }) =>
-  ((u.input_tokens * 4 + u.output_tokens * 20 + (u.cache_read_input_tokens ?? 0) * 0.2) / 1_000_000) * 100;
+function costCents(model: string, u: { input_tokens: number; output_tokens: number; cache_read_input_tokens?: number | null }): number {
+  const [i, o, c] = PRICES[model] ?? PRICES['claude-opus-5-5']!;
+  return Math.round(((u.input_tokens * i + u.output_tokens * o + (u.cache_read_input_tokens ?? 0) * c) / 1_000_000) * 100 * 100) / 100;
+}
 
 export function userMessage(input: EditorInput): string {
   return `Today's input as JSON:\n${JSON.stringify(input)}`;
@@ -51,7 +63,7 @@ export function userMessage(input: EditorInput): string {
 
 export async function runEditor(
   input: EditorInput,
-  cfg: { apiKey: string; gatewayUrl?: string; fetch?: typeof fetch },
+  cfg: { apiKey: string; model?: string; gatewayUrl?: string; fetch?: typeof fetch },
 ): Promise<EditorResult> {
   const client = new Anthropic({
     apiKey: cfg.apiKey,
@@ -61,12 +73,12 @@ export async function runEditor(
     timeout: 5 * 60_000,
   });
 
+  const model = cfg.model || EDITOR_MODEL;
   const response = await client.beta.messages.parse({
-    model: EDITOR_MODEL,
+    model,
     max_tokens: 16000,
     // Refused requests are re-run server-side on Anthropic's recommended fallback model.
-    betas: ['server-side-fallback-2026-07-01'],
-    fallbacks: 'default',
+    ...(SERVER_FALLBACKS.has(model) ? { betas: ['server-side-fallback-2026-07-01'], fallbacks: 'default' as const } : {}),
     output_config: { effort: 'medium', format: betaZodOutputFormat(BriefSchema) },
     system: SYSTEM_PROMPT,
     messages: [{ role: 'user', content: userMessage(input) }],
@@ -83,6 +95,6 @@ export async function runEditor(
     model: response.model,
     tokensIn: response.usage.input_tokens + (response.usage.cache_read_input_tokens ?? 0),
     tokensOut: response.usage.output_tokens,
-    costCents: Math.round(cost(response.usage) * 100) / 100,
+    costCents: costCents(model, response.usage),
   };
 }

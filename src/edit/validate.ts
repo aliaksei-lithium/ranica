@@ -21,14 +21,22 @@ export function validateBrief(b: Brief, known: KnownIds): Validation {
   const keep = <T>(list: T[], ok: (x: T) => boolean, what: (x: T) => string) =>
     list.filter((x) => (ok(x) ? true : (dropped.push(what(x)), false)));
 
-  const picks = (list: NewsPick[], used: Set<string>, title: number, summary: number) =>
-    keep(list, (n) => known.items.has(n.item_id) && !used.has(n.item_id) && !!used.add(n.item_id), (n) => `news ${n.item_id}`)
+  const picks = (list: NewsPick[], used: Set<string>, title: number, summary: number, perRubric: number) => {
+    const count = new Map<string, number>();
+    return keep(list, (n) => known.items.has(n.item_id) && !used.has(n.item_id) && !!used.add(n.item_id), (n) => `news ${n.item_id}`)
+      .filter((n) => {
+        const k = (count.get(n.rubric) ?? 0) + 1;
+        count.set(n.rubric, k);
+        return k <= perRubric || (dropped.push(`over limit ${n.item_id}`), false);
+      })
       .map((n) => ({ ...n, rubric: clip(n.rubric, 24), title: clip(n.title, title), summary: clip(n.summary, summary) }));
+  };
 
+  // Front page: at most 3 items per rubric, short summaries (one A4 sheet). Back page: more room.
   const front = new Set<string>();
-  const news = picks(b.news, front, 100, 220);
+  const news = picks(b.news, front, 80, 170, 3);
   const back = new Set<string>(front);
-  const backNews = picks(b.back_news, back, 100, 320);
+  const backNews = picks(b.back_news, back, 100, 320, 4);
   const nw = b.german.new_word;
   const hobby = b.hobby_fact;
 

@@ -16,6 +16,8 @@ export const PRIORITY: Record<BlockId, 1 | 2 | 3 | 4 | 5> = {
   telegram: 3,
   sport: 3,
   qr: 4,
+  /** 3rd and 4th item of a news rubric. */
+  newsextra: 4,
   hobby: 4,
   onthisday: 5,
   // back page

@@ -15,7 +15,7 @@ written in TypeScript.
 
 Status: **M1 — My edition** in progress. Every hour a `SourceRefreshWorkflow` fetches the M1 sources
 (tagesschau, Tagesspiegel, FAZ, Berliner Zeitung RSS and the Telegram channel @zerkalo_io) into D1. In the
-hour before your wake time an `EditionWorkflow` adds Open-Meteo weather, has Claude (`claude-opus-5-5`)
+hour before your wake time an `EditionWorkflow` adds Open-Meteo weather, has Claude (`claude-sonnet-5-5` by default, `EDITOR_MODEL` var)
 pick and rewrite the items into the page, and stores the edition; `/today` shows it. Without an
 `ANTHROPIC_API_KEY` (or when Claude fails) a no-LLM fallback editor fills the page with the newest items.
 Not yet: calendar, tasks, vocabulary, Cloudflare Access (roadmap: `docs/02-plan.md` §6, sources: §6.1).
