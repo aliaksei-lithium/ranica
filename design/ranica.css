@@ -143,6 +143,55 @@
 .col--left { padding-right: var(--gutter); }
 .col--right { padding-left: var(--gutter); border-left: var(--rule-hair) solid var(--rule-light); }
 
+/* ---------- Lead row and news flow (since 2026-11-08) ----------
+   The front page is: masthead, sun line, a lead row (weather · today · insight), then one flow of
+   rubrics, one-liners and small blocks in balanced CSS columns. The flow is overfilled; public/fit.js
+   removes the lowest-priority blocks from its end until the sheet fits, so no space stays empty and
+   no layout is computed in code. The back page uses the same flow in two columns. */
+.lead {
+  /* Flexible: blocks share the width by weight; a missing block (no insight) gives its room away. */
+  display: flex;
+  gap: 0 var(--gutter);
+  align-items: flex-start;
+  border-bottom: var(--rule-thin) solid var(--rule);
+  padding-bottom: var(--space-2);
+}
+.lead > * { min-width: 0; flex: 1 1 0; }
+.lead > .section--weather { flex-grow: 1.3; }
+.lead > .section--today { flex-grow: 0.9; }
+.lead > .insight, .lead > .lesson { flex-grow: 1.4; }
+.lead > .section { margin-top: var(--space-2); }
+.lead .weather__text { max-width: none; }
+.lead .insight--lead { margin-top: calc(var(--space-2) + 0.5em); }
+.lead .lesson { margin-top: var(--space-2); }
+.lead .lesson__grid { grid-template-columns: 1fr; }
+.flow {
+  columns: 3;
+  column-gap: var(--gutter);
+  column-rule: var(--rule-hair) solid var(--rule-light);
+  margin-top: var(--space-1);
+  align-self: start;
+}
+.flow--2 { columns: 2; margin-top: var(--space-2); border-top: var(--rule-medium) solid var(--rule); }
+.flow > * { break-inside: avoid; }
+.flow > .rubric, .flow > .section--depth { break-inside: auto; }
+.flow > :first-child { margin-top: var(--space-2); }
+.flow .label { break-after: avoid; }
+.flow .item, .flow .longread, .flow .digest, .flow .briefs__list li { break-inside: avoid; }
+.flow .lesson__grid { grid-template-columns: 1fr; }
+.flow .qr-strip { margin-top: var(--space-3); }
+.flow .qr-strip__codes { flex-wrap: wrap; row-gap: var(--space-1); }
+
+/* One-liners ("In brief"): rubric in small caps, then the line, then the source. */
+.briefs__list { list-style: none; margin: var(--space-1) 0 0; padding: 0; }
+.briefs:not(:has(li)) { display: none; } /* the back-page receiver before fit.js fills it */
+.briefs__list li { padding: 0.9pt 0; border-top: var(--rule-hair) solid var(--rule-light); }
+.briefs__list li:first-child { border-top: 0; }
+.briefs__rubric {
+  font-family: var(--font-sans); font-size: var(--fs-tag); font-weight: 600;
+  letter-spacing: 0.06em; text-transform: uppercase; color: var(--ink-muted);
+}
+
 /* ---------- Sections and labels ---------- */
 .section { margin-top: var(--space-3); break-inside: avoid; }
 .col > .section:first-child { margin-top: var(--space-2); }
@@ -375,7 +424,7 @@
 .comic-slot { display: none; }
 
 /* ---------- Page 2: the back page ---------- */
-.sheet--page2 { grid-template-rows: auto auto auto 1fr auto; }
+.sheet--page2 { grid-template-rows: auto auto 1fr auto auto; }
 .masthead--page2 { padding-bottom: var(--space-1); }
 .masthead--page2 .masthead__month { font-size: var(--fs-wordmark); }
 .page2-top { display: grid; grid-template-columns: 1fr 58mm; column-gap: var(--gutter); margin-top: var(--space-2); }
@@ -461,9 +510,19 @@
   .sheet { --fs-date: 56pt; }
   .sheet .lesson__grid { grid-template-columns: 1fr; }
   .sheet .footer { flex-direction: column; gap: 2pt; }
+  .sheet .lead { flex-direction: column; }
+  .sheet .lead > * { width: 100%; }
+  .sheet .flow, .sheet .flow--2 { columns: 1; }
+}
+/* Tablet / narrow desktop window: two flow columns. */
+@media screen and (min-width: 641px) and (max-width: 900px) {
+  .desk .sheet { zoom: 1; }
+  .sheet .flow { columns: 2; }
 }
 .sheet--phone { width: 100%; min-height: 0; padding: 6mm; --fs-date: 56pt; }
 .sheet--phone .columns { grid-template-columns: 1fr; }
+.sheet--phone .lead { flex-direction: column; }
+.sheet--phone .flow { columns: 1; }
 .sheet--phone .col--left { padding-right: 0; }
 .sheet--phone .col--right { padding-left: 0; border-left: 0; margin-top: var(--space-3); border-top: var(--rule-thin) solid var(--rule); }
 .sheet--phone .masthead { flex-direction: column; align-items: flex-start; gap: var(--space-2); }
@@ -486,6 +545,9 @@
   --rule-hair: 1px; --rule-thin: 1.5px; --rule-medium: 3px; --rule-heavy: 6px;
   --checkbox-size: 16px;
 }
+.sheet--kindle .lead { flex-wrap: wrap; gap: 0 40px; }
+.sheet--kindle .lead > :last-child { flex-basis: 100%; }
+.sheet--kindle .flow { columns: 2; column-gap: 40px; }
 .sheet--kindle .columns { grid-template-columns: 1fr; }
 .sheet--kindle .col--left { padding-right: 0; display: grid; grid-template-columns: 1fr 1fr; grid-template-rows: min-content 1fr; column-gap: 40px; align-items: start; }
 .sheet--kindle .col--left .section--weather { grid-column: 1; grid-row: 1; }

@@ -17,8 +17,10 @@ export interface Brief {
   weather_note: string;
   agenda: { event_id: string; note: string }[];
   tasks: { task_id: string; context: string }[];
-  /** Front page news, 2–4 rubrics. */
+  /** Front page news, up to 5 rubrics. */
   news: NewsPick[];
+  /** One-line items that fill the rest of the page (absent in editions before 2026-11-08). */
+  briefs?: { rubric: string; item_id: string; text: string }[];
   /** `summary` is the one-line front-page digest; `points` are the back-page bullets. */
   telegram_digest: { channel: string; summary: string; points: string[] }[];
   /** 2–4 sentences, ≤ 400 chars. */

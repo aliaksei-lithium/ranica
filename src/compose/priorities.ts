@@ -18,6 +18,8 @@ export const PRIORITY: Record<BlockId, 1 | 2 | 3 | 4 | 5> = {
   qr: 4,
   /** 3rd and 4th item of a news rubric. */
   newsextra: 4,
+  /** One-liners fill the rest of the sheet; dropped first, from the end. */
+  brief: 5,
   hobby: 4,
   onthisday: 5,
   // back page

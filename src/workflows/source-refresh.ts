@@ -16,30 +16,34 @@ export interface RefreshOutput {
   pruned: number;
 }
 
+/** Sync, one step per source, prune: shared by SourceRefreshWorkflow and a manual rebuild. */
+export async function refreshAllSteps(db: D1Database, step: WorkflowStep): Promise<RefreshOutput> {
+  const { synced, subscribed } = await step.do('sync sources', async () => ({
+    synced: await syncSources(db, SOURCES),
+    subscribed: await subscribeAllUsers(db),
+  }));
+
+  const results: RefreshResult[] = [];
+  for (const source of SOURCES) {
+    try {
+      results.push(
+        await step.do(
+          `refresh ${source.id}`,
+          { retries: { limit: 2, delay: '1 minute', backoff: 'exponential' }, timeout: '1 minute' },
+          () => refreshSource(db, source),
+        ),
+      );
+    } catch (e) {
+      results.push({ id: source.id, status: null, parsed: 0, inserted: 0, error: e instanceof Error ? e.message : String(e) });
+    }
+  }
+
+  const pruned = await step.do('prune items', () => pruneItems(db, retentionCutoff(new Date())));
+  return { synced, subscribed, results, pruned };
+}
+
 export class SourceRefreshWorkflow extends WorkflowEntrypoint<Env, RefreshParams> {
   async run(_event: WorkflowEvent<RefreshParams>, step: WorkflowStep): Promise<RefreshOutput> {
-    const db = this.env.DB;
-    const { synced, subscribed } = await step.do('sync sources', async () => ({
-      synced: await syncSources(db, SOURCES),
-      subscribed: await subscribeAllUsers(db),
-    }));
-
-    const results: RefreshResult[] = [];
-    for (const source of SOURCES) {
-      try {
-        results.push(
-          await step.do(
-            `refresh ${source.id}`,
-            { retries: { limit: 2, delay: '1 minute', backoff: 'exponential' }, timeout: '1 minute' },
-            () => refreshSource(db, source),
-          ),
-        );
-      } catch (e) {
-        results.push({ id: source.id, status: null, parsed: 0, inserted: 0, error: e instanceof Error ? e.message : String(e) });
-      }
-    }
-
-    const pruned = await step.do('prune items', () => pruneItems(db, retentionCutoff(new Date())));
-    return { synced, subscribed, results, pruned };
+    return refreshAllSteps(this.env.DB, step);
   }
 }

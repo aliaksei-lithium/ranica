@@ -11,16 +11,21 @@ export function editionHour(wakeTime: string): number {
 }
 
 /**
- * Cron Trigger (wrangler.jsonc `triggers.crons`), hourly: refresh the sources, and start the edition
- * of every reader whose edition hour it is. Instance ids are per reader and day, so a second run
- * in the same hour does not build a second edition. (Workflow `schedules` would need the paid plan.)
+ * Cron Trigger (wrangler.jsonc `triggers.crons`), hourly. Sources are refreshed when any reader has
+ * auto_refresh on; a reader's editions (all their languages, one instance) are built in their
+ * edition hour when auto_edition is on. Instance ids are per reader and day, so a second run in the
+ * same hour does not build twice. (Workflow `schedules` would need the paid plan.)
  */
 export const scheduled: ExportedHandlerScheduledHandler<Env> = async (controller, env, ctx) => {
   if (controller.cron !== REFRESH_CRON) return;
-  const refresh = await ctx.exports.SourceRefreshWorkflow.create({ params: {} });
-  console.log(`source-refresh started: ${refresh.id}`);
+  const readers = await listReaders(env.DB);
+  if (readers.some((r) => r.autoRefresh)) {
+    const refresh = await ctx.exports.SourceRefreshWorkflow.create({ params: {} });
+    console.log(`source-refresh started: ${refresh.id}`);
+  }
   const now = new Date(controller.scheduledTime);
-  for (const reader of await listReaders(env.DB)) {
+  for (const reader of readers) {
+    if (!reader.autoEdition) continue;
     const local = localNow(now, reader.timezone);
     if (local.hour !== editionHour(reader.wakeTime)) continue;
     try {

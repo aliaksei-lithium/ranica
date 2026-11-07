@@ -47,6 +47,7 @@ function openMeteo(rainAt = 15) {
 const reader: Reader = {
   id: 1, name: 'Reader', editionTitle: 'Утренний', locale: 'en', learnerLevel: 'B1', timezone: 'Europe/Berlin',
   city: 'Berlin', lat: 52.52, lon: 13.405, wakeTime: '07:00', contextMd: '',
+  autoRefresh: true, autoEdition: true, editionLangs: ['en'],
 };
 
 const userItem = (id: number, over: Partial<UserItem> = {}): UserItem => ({
@@ -68,7 +69,8 @@ const brief = (over: Partial<Brief> = {}): Brief => ({
     { rubric: 'Berlin', item_id: 'n2', title: 'Berlin story', summary: 'Two sentences.' },
     { rubric: 'Germany', item_id: 'n1', title: 'Germany story', summary: 'Two sentences.' },
   ],
-  telegram_digest: [{ channel: '@zerkalo_io', summary: 'One post about Minsk', points: ['Rent in Minsk'] }],
+  briefs: [],
+  telegram_digest: [{ channel: '@zerkalo_io', summary: 'Один пост о Минске', points: ['Аренда в Минске'] }],
   insight: '', sport: null, german: { cards: [], new_word: { de: 'der Titel', en: 'title', example: 'Der Titel ist kurz.', from_item_id: 'n1' } },
   hobby_fact: null, on_this_day: { text: 'Morgenstund hat Gold im Mund.', author: 'Sprichwort' }, tomorrow: 'Rain likely',
   deep: [{ rubric: 'Germany', item_id: 'n1', title: 'Longer', body: 'Five sentences.' }],
@@ -151,19 +153,17 @@ describe('validateBrief', () => {
 });
 
 describe('fallback editor', () => {
-  it('picks newest items per rubric, Berliner Zeitung under Berlin, World on the back page', () => {
+  it('picks newest items per rubric, Berliner Zeitung under Berlin; Telegram stays Russian', () => {
     const b = fallbackBrief(buildEditorInput(reader, DATE, items, parseWeather(openMeteo() as never, DATE, 'en')));
-    expect(b.news.map((n) => [n.rubric, n.item_id])).toEqual([['Berlin', 'n4'], ['Berlin', 'n2'], ['Germany', 'n1']]);
-    expect(b.back_news.map((n) => n.item_id)).toEqual(['n3']);
-    expect(b.telegram_digest).toEqual([{ channel: '@zerkalo_io', summary: '1 post', points: ['Пост'] }]);
+    expect(b.news.map((n) => [n.rubric, n.item_id])).toEqual([['Berlin', 'n4'], ['Berlin', 'n2'], ['Germany', 'n1'], ['World', 'n3']]);
+    expect(b.telegram_digest).toEqual([{ channel: '@zerkalo_io', summary: '1 пост', points: ['Пост'] }]);
     expect(b.tomorrow).toBe('+5° / +1°, rain, rain 80 %');
     expect(BriefSchema.safeParse({ ...b, on_this_day: null }).success).toBe(true);
   });
 
   it('uses German rubric names for a German reader', () => {
     const b = fallbackBrief(buildEditorInput({ ...reader, locale: 'de' }, DATE, items, null));
-    expect(new Set(b.news.map((n) => n.rubric))).toEqual(new Set(['Berlin', 'Deutschland']));
-    expect(b.back_news[0]!.rubric).toBe('Welt');
+    expect(new Set(b.news.map((n) => n.rubric))).toEqual(new Set(['Berlin', 'Deutschland', 'Welt']));
   });
 });
 
@@ -242,11 +242,11 @@ describe('EditionWorkflow', () => {
       throw new Error(`unexpected fetch ${url}`);
     });
     const { out } = await run('a', DATE);
-    expect(out).toMatchObject({ date: DATE, issue: 1, editor: 'fallback', items: 3, error: 'no ANTHROPIC_API_KEY' });
+    expect(out).toMatchObject({ date: DATE, issue: 1, items: 3, refreshed: null, editions: [{ lang: 'en', editor: 'fallback', error: 'no ANTHROPIC_API_KEY' }] });
     expect(weatherCalls).toBe(1);
-    const e = await loadEdition(db, 1, DATE);
+    const e = await loadEdition(db, 1, { date: DATE });
     expect(e!.facts.weather!.max).toBe(6);
-    expect(e!.brief.news.map((n) => n.rubric)).toEqual(['Berlin', 'Germany']);
+    expect(e!.brief.news.map((n) => n.rubric)).toEqual(['Berlin', 'Germany', 'World']);
 
     const page = await (await exports.default.fetch('https://ranica.test/today')).text();
     expect(page).toContain('BVG');
@@ -261,7 +261,7 @@ describe('EditionWorkflow', () => {
     await run('a', DATE);
     const { out } = await run('b', DATE);
     expect(out.issue).toBe(1);
-    const e = await loadEdition(db, 1, DATE);
+    const e = await loadEdition(db, 1, { date: DATE });
     expect(e!.facts.weather).toBeNull();
     expect(e!.facts.unavailable).toEqual({ weather: 'Open-Meteo' });
   });
@@ -288,31 +288,97 @@ it('the fake edition still renders without a database', async () => {
 });
 
 describe('front page layout', () => {
-  it('caps front rubrics at 3 items; back rubrics at 4', () => {
+  it('caps front rubrics at 4 items; one-liners skip items already on the front', () => {
     const known = { items: new Set(['n1', 'n2', 'n3', 'n4', 'n5', 'n6']), events: new Set<string>(), tasks: new Set<string>(), cards: new Set<string>(), channels: new Set<string>() };
-    const four = ['n1', 'n2', 'n3', 'n4'].map((id) => ({ rubric: 'Germany', item_id: id, title: id, summary: '' }));
-    const { brief: b, dropped } = validateBrief(brief({ news: four, back_news: [] }), known);
-    expect(b.news.map((n) => n.item_id)).toEqual(['n1', 'n2', 'n3']);
-    expect(dropped).toContain('over limit n4');
+    const five = ['n1', 'n2', 'n3', 'n4', 'n5'].map((id) => ({ rubric: 'Germany', item_id: id, title: id, summary: '' }));
+    const briefs = [{ rubric: 'Germany', item_id: 'n1', text: 'again' }, { rubric: 'Germany', item_id: 'n6', text: 'x'.repeat(150) }];
+    const { brief: b, dropped } = validateBrief(brief({ news: five, briefs, back_news: [] }), known);
+    expect(b.news.map((n) => n.item_id)).toEqual(['n1', 'n2', 'n3', 'n4']);
+    expect(dropped).toEqual(expect.arrayContaining(['over limit n5', 'brief n1']));
+    expect(b.briefs!.map((x) => [x.item_id, x.text.length])).toEqual([['n6', 110]]);
   });
 
-  it('without events and tasks the first rubric goes to the left column; 3rd+ items are trimmable', async () => {
+  it('lead row, one news flow with one-liners last; extra items and one-liners are trimmable', async () => {
     const { renderEdition } = await import('../src/compose/compose');
     const facts = buildFacts({ reader, date: DATE, issue: 1, generatedAt: '06:00', items, weather: null, publicUrl: 'x/today' });
-    const b = brief({ news: [
-      { rubric: 'Germany', item_id: 'n1', title: 'G1', summary: '' },
-      { rubric: 'Berlin', item_id: 'n2', title: 'B1', summary: '' },
-      { rubric: 'Berlin', item_id: 'n4', title: 'B2', summary: '' },
-      { rubric: 'Berlin', item_id: 'n5', title: 'B3', summary: '' },
-    ] });
-    const html = renderEdition({ facts, brief: b }, 'print', { backPage: false });
-    const left = html.slice(html.indexOf('col col--left'), html.indexOf('col col--right'));
-    expect(left).toContain('id="germany"');
-    expect(left).not.toContain('id="berlin"');
+    const b = brief({
+      news: [
+        { rubric: 'Germany', item_id: 'n1', title: 'G1', summary: '' },
+        { rubric: 'Berlin', item_id: 'n2', title: 'B1', summary: '' },
+        { rubric: 'Berlin', item_id: 'n4', title: 'B2', summary: '' },
+        { rubric: 'Berlin', item_id: 'n5', title: 'B3', summary: '' },
+      ],
+      briefs: [{ rubric: 'World', item_id: 'n3', text: 'One line' }],
+      insight: 'Two facts connected.',
+    });
+    const html = renderEdition({ facts, brief: b }, 'print', { backPage: false, nav: { langs: ['en', 'de'], path: '/today' } });
+    const lead = html.slice(html.indexOf('class="lead"'), html.indexOf('class="flow"'));
+    const flow = html.slice(html.indexOf('class="flow"'), html.indexOf('<footer'));
+    expect(lead).toContain('data-block="insight"');
+    expect(flow.indexOf('id="germany"')).toBeLessThan(flow.indexOf('id="berlin"'));
+    expect(flow.indexOf('id="berlin"')).toBeLessThan(flow.indexOf('One line'));
     expect(html.match(/data-block="newsextra"/g)).toHaveLength(1);
+    expect(html.match(/data-block="brief"/g)).toHaveLength(1);
+    expect(flow).toContain('lang="ru"'); // the Russian Telegram digest keeps its language
+    expect(html).toContain('href="/today?lang=de&amp;view=print"');
+  });
+});
 
-    const withEvents = renderEdition({ facts: { ...facts, events: [{ id: 'e1', time: '09:00', title: 'Standup' }] }, brief: b }, 'print', { backPage: false });
-    const left2 = withEvents.slice(withEvents.indexOf('col col--left'), withEvents.indexOf('col col--right'));
-    expect(left2).not.toContain('id="germany"');
+describe('settings, languages and manual rebuild', () => {
+  const db = env.DB;
+  beforeEach(async () => {
+    await db.batch(['DELETE FROM edition', 'DELETE FROM item', 'DELETE FROM subscription', 'DELETE FROM source', 'DELETE FROM profile', 'DELETE FROM user'].map((q) => db.prepare(q)));
+    await db.prepare(`INSERT INTO user (id, name, city, lat, lon, wake_time, edition_langs) VALUES (1, 'Reader', 'Berlin', 52.52, 13.405, '07:00', 'en,de')`).run();
+  });
+  afterEach(() => vi.unstubAllGlobals());
+
+  it('saving the form turns the schedule off; the cron then starts nothing', async () => {
+    const form = new URLSearchParams([['lang', 'de'], ['wakeTime', '06:30']]); // both checkboxes unticked
+    const res = await exports.default.fetch('https://ranica.test/admin/settings?key=test-key', { method: 'POST', body: form, redirect: 'manual' });
+    expect(res.status).toBe(303);
+    const r = await db.prepare('SELECT auto_refresh, auto_edition, edition_langs, wake_time FROM user WHERE id = 1').first();
+    expect(r).toEqual({ auto_refresh: 0, auto_edition: 0, edition_langs: 'de', wake_time: '06:30' });
+
+    await using refresh = await introspectWorkflow(env.SOURCE_REFRESH);
+    await using edition = await introspectWorkflow(env.EDITION);
+    const ctx = createExecutionContext();
+    await worker.scheduled(createScheduledController({ cron: REFRESH_CRON, scheduledTime: new Date('2026-11-07T04:00:00Z') }), env, ctx);
+    await waitOnExecutionContext(ctx);
+    expect(await refresh.get()).toHaveLength(0);
+    expect(await edition.get()).toHaveLength(0);
+  });
+
+  it('the settings page needs the key and shows the switches', async () => {
+    expect((await exports.default.fetch('https://ranica.test/admin')).status).toBe(404);
+    const html = await (await exports.default.fetch('https://ranica.test/admin?key=test-key')).text();
+    expect(html).toContain('name="autoRefresh"');
+    expect(html).toContain('Rebuild today');
+  });
+
+  it('Rebuild now refreshes sources, then builds every chosen language; /today switches language', async () => {
+    vi.stubGlobal('fetch', async (url: string) => {
+      const u = String(url);
+      if (u.includes('open-meteo')) return Response.json(openMeteo());
+      if (u.startsWith('https://t.me/')) return new Response('<html></html>');
+      return new Response(`<rss><channel><item><title>Neu ${u.length}</title><link>${u}#1</link><guid>${u}</guid><pubDate>${new Date().toUTCString()}</pubDate></item></channel></rss>`);
+    });
+    await using wf = await introspectWorkflow(env.EDITION);
+    await wf.modifyAll(async (m) => { await m.disableRetryDelays(); });
+    const res = await exports.default.fetch('https://ranica.test/admin/rebuild?key=test-key', { method: 'POST', redirect: 'manual' });
+    expect(res.status).toBe(303);
+    expect(res.headers.get('location')).toMatch(/run=/);
+    const [instance] = await wf.get();
+    await instance!.waitForStatus('complete');
+    const out = (await instance!.getOutput()) as EditionOutput;
+    expect(out.refreshed).toBe(SOURCES.length - 1); // one item per RSS feed, none from Telegram
+    expect(out.editions.map((e) => e.lang)).toEqual(['en', 'de']);
+
+    expect(await (await exports.default.fetch('https://ranica.test/today')).text()).toContain('<html lang="en"'); // reader locale
+    const de = await (await exports.default.fetch('https://ranica.test/today?lang=de')).text();
+    expect(de).toContain('<html lang="de"');
+    expect(de).toContain('<strong>Deutsch</strong>');
+    expect(de).toContain('href="/today?lang=en"');
+    const en = await (await exports.default.fetch(`https://ranica.test/editions/${out.date}?lang=en`)).text();
+    expect(en).toContain('<html lang="en"');
   });
 });

@@ -32,11 +32,15 @@ export function validateBrief(b: Brief, known: KnownIds): Validation {
       .map((n) => ({ ...n, rubric: clip(n.rubric, 24), title: clip(n.title, title), summary: clip(n.summary, summary) }));
   };
 
-  // Front page: at most 3 items per rubric, short summaries (one A4 sheet). Back page: more room.
+  // Front page: at most 4 items per rubric (fit.js trims the 3rd/4th first), short summaries;
+  // then one-liners. Back page: up to 5 items per rubric.
   const front = new Set<string>();
-  const news = picks(b.news, front, 80, 170, 3);
+  const news = picks(b.news, front, 80, 170, 4);
+  const briefs = keep(b.briefs ?? [], (x) => known.items.has(x.item_id) && !front.has(x.item_id) && !!front.add(x.item_id), (x) => `brief ${x.item_id}`)
+    .slice(0, 24)
+    .map((x) => ({ ...x, rubric: clip(x.rubric, 24), text: clip(x.text, 110) }));
   const back = new Set<string>(front);
-  const backNews = picks(b.back_news, back, 100, 320, 4);
+  const backNews = picks(b.back_news, back, 100, 320, 5);
   const nw = b.german.new_word;
   const hobby = b.hobby_fact;
 
@@ -48,6 +52,7 @@ export function validateBrief(b: Brief, known: KnownIds): Validation {
       agenda: keep(b.agenda, (a) => known.events.has(a.event_id), (a) => `event ${a.event_id}`),
       tasks: keep(b.tasks, (t) => known.tasks.has(t.task_id), (t) => `task ${t.task_id}`),
       news,
+      briefs,
       telegram_digest: keep(b.telegram_digest, (t) => known.channels.has(t.channel), (t) => `channel ${t.channel}`)
         .map((t) => ({ ...t, summary: clip(t.summary, 120), points: t.points.slice(0, 5).map((p) => clip(p, 160)) })),
       insight: clip(b.insight, 420),

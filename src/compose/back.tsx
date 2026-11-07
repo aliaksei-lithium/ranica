@@ -5,7 +5,7 @@ import type { Edition } from '../model';
 import { fit } from './priorities';
 import { dateParts, shortDay, signed, t } from './i18n';
 import { Footer } from './parts';
-import { rubrics } from './front';
+import { NewsRubric, cyrillic, rubrics } from './front';
 
 export const BackPage: FC<{ e: Edition }> = ({ e }) => {
   const { facts: f, brief: b } = e;
@@ -19,7 +19,7 @@ export const BackPage: FC<{ e: Edition }> = ({ e }) => {
     const tag = item.minutes ? `${item.source} · ${item.minutes} ${L.min}` : item.source;
     deep.set(x.rubric, [...(deep.get(x.rubric) ?? []), { title: x.title, body: x.body, tag }]);
   }
-  const back = rubrics(e, b.back_news, 2);
+  const back = rubrics(e, b.back_news, 4, 5);
   const posts = new Map(f.telegram.map((c) => [c.channel, c.posts]));
   const [rowWeather, rowCalendar, rowDue] = L.weekRows;
   const [colTime, rowTemp, rowFeels, rowRain, rowWind] = L.hourRows;
@@ -122,8 +122,8 @@ export const BackPage: FC<{ e: Edition }> = ({ e }) => {
         )}
       </div>
 
-      <div class="columns">
-        <div class="col col--left">
+      {/* One flow in two balanced columns (see front.tsx): in-depth pieces, more rubrics, Telegram. */}
+      <div class="flow flow--2">
           {deep.size > 0 && (
             <section class="section section--depth" {...fit('depth')}>
               <span class="label">{L.depth}</span>
@@ -143,21 +143,8 @@ export const BackPage: FC<{ e: Edition }> = ({ e }) => {
               ))}
             </section>
           )}
-        </div>
-        <div class="col col--right">
           {back.map((r) => (
-            <section class="rubric" {...fit('world')}>
-              <span class="label">{r.name}</span>
-              {r.items.map((n) => (
-                <article class="item">
-                  <a class="item__title" href={n.url}>{n.title}</a>
-                  <p class="item__summary">
-                    {n.summary}
-                    <span class="tag">{n.source}</span>
-                  </p>
-                </article>
-              ))}
-            </section>
+            <NewsRubric r={r} block="world" id={false} />
           ))}
           {b.telegram_digest.length > 0 && (
             <section class="rubric" {...fit('digest')}>
@@ -168,7 +155,7 @@ export const BackPage: FC<{ e: Edition }> = ({ e }) => {
                     {tg.channel}
                     {posts.has(tg.channel) && <span class="tag">{posts.get(tg.channel)} {L.posts}</span>}
                   </span>
-                  <ul class="digest__list">
+                  <ul class="digest__list" lang={tg.points.some(cyrillic) ? 'ru' : undefined}>
                     {tg.points.map((p) => (
                       <li>{p}</li>
                     ))}
@@ -198,10 +185,14 @@ export const BackPage: FC<{ e: Edition }> = ({ e }) => {
               </div>
             </section>
           )}
-        </div>
+          {/* Filled by public/fit.js with the one-liners that did not fit on the front page. */}
+          <section class="rubric briefs" data-fit-empty="li" data-fit-receive="brief">
+            <span class="label">{L.briefsMore}</span>
+            <ul class="briefs__list" />
+          </section>
       </div>
 
-      {f.weekWords.length > 0 && (
+      {(f.weekWords.length > 0 || b.word_of_day) && (
         <section class="lesson lesson--words" lang="de" {...fit('words')}>
           <span class="label" lang={f.lang}>
             {L.words}

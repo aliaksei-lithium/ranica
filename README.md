@@ -14,7 +14,9 @@ Runs entirely on Cloudflare (Workers, Workflows, D1, R2, Browser Run) within the
 written in TypeScript.
 
 Status: **M1 — My edition** in progress. Every hour a `SourceRefreshWorkflow` fetches the M1 sources
-(tagesschau, Tagesspiegel, FAZ, Berliner Zeitung RSS and the Telegram channel @zerkalo_io) into D1. In the
+(tagesschau, Tagesspiegel, FAZ, Berliner Zeitung, rbb24, Berliner Morgenpost, Handelsblatt RSS and the
+Telegram channel @zerkalo_io) into D1. Both the hourly fetch and the daily build can be switched off on
+`/admin`, which also has a "Rebuild now" button; editions are built in English and/or German. In the
 hour before your wake time an `EditionWorkflow` adds Open-Meteo weather, has Claude (`claude-sonnet-5-5` by default, `EDITOR_MODEL` var)
 pick and rewrite the items into the page, and stores the edition; `/today` shows it. Without an
 `ANTHROPIC_API_KEY` (or when Claude fails) a no-LLM fallback editor fills the page with the newest items.
@@ -35,7 +37,7 @@ npm run render     # with dev running: PDFs/PNGs into out/ (needs a global Playw
 
 | Route | What |
 |---|---|
-| `/today?view=web\|print\|kindle\|eink&pages=1\|2` | the newest edition; `print` = A4 sheets (front + back) with fit-to-page, `kindle` = 1236 × 1648 px, `eink` = 800 × 480 widget |
+| `/today?lang=en\|de&view=web\|print\|kindle\|eink&pages=1\|2` | the newest edition (language switch above the page); `print` = A4 sheets (front + back) with fit-to-page, `kindle` = 1236 × 1648 px, `eink` = 800 × 480 widget |
 | `/today?fake=1&lang=en\|de&day=full\|thin` | the fake edition from `src/fake/` (also shown while no edition exists) |
 | `/today.eink` | the e-ink widget |
 | `/editions`, `/editions/<date>` | archive of stored editions |
@@ -44,7 +46,8 @@ npm run render     # with dev running: PDFs/PNGs into out/ (needs a global Playw
 | `POST /admin/refresh?key=…` | start a `SourceRefreshWorkflow` run now (it also runs hourly); returns the instance id |
 | `/admin/refresh/<id>?key=…` | status and output of that run (per source: HTTP status, parsed, inserted, error) |
 | `/admin/sources?key=…` | per source: last fetch, last error, items stored, newest item |
-| `POST /admin/edition?key=…[&date=YYYY-MM-DD]` | build today's (or that day's) edition now; returns the instance id |
+| `/admin?key=…` | settings: hourly fetch on/off, daily build on/off, wake time, languages; **Rebuild now**; recent editions with cost; sources |
+| `POST /admin/edition?key=…[&date=YYYY-MM-DD][&refresh=1]` | build today's (or that day's) editions now, optionally fetching sources first; returns the instance id |
 | `/admin/edition/<id>?key=…` | status and output: editor used, items, dropped ids, error, cost |
 | `/health` | status |
 

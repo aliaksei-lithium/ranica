@@ -18,6 +18,10 @@ export interface Reader {
   lon: number;
   wakeTime: string;
   contextMd: string;
+  /** Settings (migrations/0003): hourly source refresh, daily edition, languages built. */
+  autoRefresh: boolean;
+  autoEdition: boolean;
+  editionLangs: Lang[];
 }
 
 /** An item as the editor sees it. `id` is the "n<row id>" used in the Brief. */
@@ -57,7 +61,7 @@ export function localNow(now: Date, timezone: string): { date: string; time: str
 
 const itemId = (i: UserItem) => `n${i.id}`;
 const toEditorItem = (i: UserItem): EditorItem => ({
-  id: itemId(i), source: i.source, rubric: i.rubric, title: i.title, body: clip(i.body, 500), published: i.publishedAt,
+  id: itemId(i), source: i.source, rubric: i.rubric, title: i.title, body: clip(i.body, 300), published: i.publishedAt,
 });
 
 export function buildEditorInput(reader: Reader, date: string, items: UserItem[], weather: WeatherFacts | null): EditorInput {

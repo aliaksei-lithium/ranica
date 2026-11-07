@@ -139,6 +139,6 @@ describe('/probe/sources', () => {
     expect(by.get('tg-zerkalo')).toMatchObject({ ok: true, items: 2 });
     expect(by.get('faz-inland')).toMatchObject({ ok: false, status: null, error: 'connect timeout' });
     expect(by.get('berliner-zeitung')).toMatchObject({ ok: false, status: 403 });
-    expect(body.ok).toBe(4);
+    expect(body.ok).toBe(SOURCES.length - 3); // faz-inland, faz-ausland, berliner-zeitung fail
   });
 });

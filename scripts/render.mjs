@@ -2,6 +2,8 @@
 // Start the dev server first (`npm run dev`), then: `npm run render [-- --base http://127.0.0.1:8787]`.
 // Writes A4 PDFs (front + back) + one PNG per sheet, browser/phone views, Kindle PDF/PNG and the e-ink PNG into out/.
 // Browser Run (src/render/browser.ts, M1) will do the same steps in one session in production.
+// Every page is the fake edition (?fake=1): this renders the templates, independent of D1 content
+// (CI's local D1 is empty, so the real /today would be a 500).
 import { mkdirSync } from 'node:fs';
 import { createRequire } from 'node:module';
 
@@ -20,16 +22,16 @@ mkdirSync(OUT, { recursive: true });
 const A4 = { width: 794, height: 1123 }; // 210 × 297 mm at 96 dpi
 
 const jobs = [
-  { name: 'a4-en', path: '/today?view=print&lang=en', kind: 'a4' },
-  { name: 'a4-de', path: '/today?view=print&lang=de', kind: 'a4' },
-  { name: 'a4-thin', path: '/today?view=print&lang=en&day=thin', kind: 'a4' },
-  { name: 'a4-thin-de', path: '/today?view=print&lang=de&day=thin', kind: 'a4' },
-  { name: 'web-900', path: '/today?lang=en', kind: 'screen', viewport: { width: 900, height: 1200 } },
-  { name: 'phone', path: '/today?lang=en', kind: 'phone' },
-  { name: 'kindle', path: '/today?view=kindle&lang=en', kind: 'kindle' },
-  { name: 'kindle-de', path: '/today?view=kindle&lang=de', kind: 'kindle' },
-  { name: 'eink', path: '/today?view=eink&lang=en', kind: 'eink' },
-  { name: 'eink-de', path: '/today?view=eink&lang=de', kind: 'eink' },
+  { name: 'a4-en', path: '/today?view=print&lang=en&fake=1', kind: 'a4' },
+  { name: 'a4-de', path: '/today?view=print&lang=de&fake=1', kind: 'a4' },
+  { name: 'a4-thin', path: '/today?view=print&lang=en&day=thin&fake=1', kind: 'a4' },
+  { name: 'a4-thin-de', path: '/today?view=print&lang=de&day=thin&fake=1', kind: 'a4' },
+  { name: 'web-900', path: '/today?lang=en&fake=1', kind: 'screen', viewport: { width: 900, height: 1200 } },
+  { name: 'phone', path: '/today?lang=en&fake=1', kind: 'phone' },
+  { name: 'kindle', path: '/today?view=kindle&lang=en&fake=1', kind: 'kindle' },
+  { name: 'kindle-de', path: '/today?view=kindle&lang=de&fake=1', kind: 'kindle' },
+  { name: 'eink', path: '/today?view=eink&lang=en&fake=1', kind: 'eink' },
+  { name: 'eink-de', path: '/today?view=eink&lang=de&fake=1', kind: 'eink' },
 ];
 
 const browser = await chromium.launch();
@@ -43,7 +45,8 @@ try {
       : { viewport: job.viewport, deviceScaleFactor: 2 };
     const ctx = await browser.newContext(ctxOpts);
     const page = await ctx.newPage();
-    await page.goto(BASE + job.path, { waitUntil: 'networkidle' });
+    const res = await page.goto(BASE + job.path, { waitUntil: 'networkidle' });
+    if (!res || !res.ok()) throw new Error(`${job.name}: ${job.path} returned HTTP ${res?.status()}`);
     await page.evaluate(() => document.fonts.ready);
 
     if (job.kind === 'a4') {

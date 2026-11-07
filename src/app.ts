@@ -2,16 +2,18 @@ import { Hono } from 'hono';
 import type { Context } from 'hono';
 import type { Lang } from './model';
 import { fakeArchive, fakeEdition, type Variant } from './fake/editions';
-import { renderEdition, type View } from './compose/compose';
+import { renderEdition, type Nav, type View } from './compose/compose';
 import { ArchivePage } from './web/archive';
 import { probeSources } from './web/probe';
 import type { Env } from './env';
-import { listEditions, loadEdition, sourceStatus } from './db/queries';
+import { editionLog, getReader, listEditions, loadEdition, saveSettings, sourceStatus, type StoredEdition } from './db/queries';
+import { SettingsPage } from './web/settings';
 import type { RefreshParams } from './workflows/source-refresh';
 import type { EditionParams } from './workflows/edition';
 
-// HTTP routes. /today shows the newest stored edition; ?fake=1 (or no edition
-// yet) shows the fake one from src/fake/ for template work. /admin/* needs PROBE_KEY.
+// HTTP routes. /today shows the newest stored edition in ?lang= (default: the first language
+// stored); ?fake=1 (or no edition yet) shows the fake one from src/fake/ for template work.
+// /admin (settings, rebuild) and /admin/* need PROBE_KEY.
 
 /** The single M1 reader (seed/me.sql). */
 const READER = 1;
@@ -28,11 +30,14 @@ const authorized = (c: Context<{ Bindings: Env }>) => {
 const refreshWorkflow = (c: Context<{ Bindings: Env }>): Workflow<RefreshParams> => c.executionCtx.exports.SourceRefreshWorkflow;
 const editionWorkflow = (c: Context<{ Bindings: Env }>): Workflow<EditionParams> => c.executionCtx.exports.EditionWorkflow;
 
-/** The stored edition (newest, or for `date`), unless ?fake=1 or there is none / no database (tests). */
-async function realEdition(c: Context<{ Bindings: Env }>, date?: string) {
+/** The stored edition (newest, or for `date`) in ?lang=, unless ?fake=1 or there is none / no database (tests). */
+async function realEdition(c: Context<{ Bindings: Env }>, date?: string): Promise<StoredEdition | null> {
   if (c.req.query('fake') === '1' || !c.env?.DB) return null;
-  return loadEdition(c.env.DB, READER, date);
+  const lang = c.req.query('lang');
+  return loadEdition(c.env.DB, READER, { date, lang: lang === 'en' || lang === 'de' ? lang : undefined });
 }
+
+const nav = (e: StoredEdition, path: string): Nav => ({ langs: e.langs, path });
 
 const pick = <T extends string>(value: string | undefined, allowed: readonly T[], fallback: T): T =>
   allowed.includes(value as T) ? (value as T) : fallback;
@@ -55,8 +60,9 @@ app.get('/health', (c) => c.json({ ok: true, milestone: 'M1' }));
 /** The edition: ?view=web|print|kindle|eink &pages=1|2; fake only: ?fake=1 &lang=en|de &day=full|thin */
 app.get('/today', async (c) => {
   const o = options(c);
-  const e = (await realEdition(c)) ?? fakeEdition(o.lang, o.variant);
-  return c.html(renderEdition(e, o.view, o));
+  const real = await realEdition(c);
+  if (real) return c.html(renderEdition(real, o.view, { ...o, nav: nav(real, '/today') }));
+  return c.html(renderEdition(fakeEdition(o.lang, o.variant), o.view, o));
 });
 
 /** E-ink widget, 800 × 480 (same as /today?view=eink). */
@@ -97,12 +103,48 @@ app.get('/admin/refresh/:id', async (c) => {
   return c.json(await instance.status());
 });
 
-/** Build today's edition now (also runs by itself in the hour before wake time). */
+/** Build today's edition now (also runs by itself in the hour before wake time). ?refresh=1 fetches sources first. */
 app.post('/admin/edition', async (c) => {
   if (!authorized(c)) return c.notFound();
   const date = c.req.query('date');
-  const instance = await editionWorkflow(c).create({ params: { userId: READER, ...(date ? { date } : {}) } });
+  const refresh = c.req.query('refresh') === '1';
+  const instance = await editionWorkflow(c).create({ params: { userId: READER, ...(date ? { date } : {}), ...(refresh ? { refresh } : {}) } });
   return c.json({ id: instance.id, status: await instance.status() }, 202);
+});
+
+/** Settings page: schedule on/off, languages, wake time, rebuild button, recent editions, sources. */
+app.get('/admin', async (c) => {
+  if (!authorized(c)) return c.notFound();
+  const reader = await getReader(c.env.DB, READER);
+  if (!reader) return c.text('No reader: run seed/me.sql', 500);
+  const runId = c.req.query('run');
+  let run: { id: string; status: string; error?: string | null } | undefined;
+  if (runId) {
+    try {
+      const s = await (await editionWorkflow(c).get(runId)).status();
+      run = { id: runId, status: s.status, error: s.error?.message ?? null };
+    } catch {
+      run = { id: runId, status: 'unknown' };
+    }
+  }
+  const [log, sources] = await Promise.all([editionLog(c.env.DB, READER), sourceStatus(c.env.DB)]);
+  return c.html(`<!doctype html>${SettingsPage({ reader, keyParam: c.req.query('key')!, log, sources, run })}`);
+});
+
+app.post('/admin/settings', async (c) => {
+  if (!authorized(c)) return c.notFound();
+  const body = await c.req.parseBody({ all: true });
+  const langs = ([] as unknown[]).concat(body.lang ?? []).filter((l): l is Lang => l === 'en' || l === 'de');
+  const wake = typeof body.wakeTime === 'string' && /^\d{2}:\d{2}$/.test(body.wakeTime) ? body.wakeTime : '07:00';
+  await saveSettings(c.env.DB, READER, { autoRefresh: body.autoRefresh === 'on', autoEdition: body.autoEdition === 'on', editionLangs: langs, wakeTime: wake });
+  return c.redirect(`/admin?key=${encodeURIComponent(c.req.query('key')!)}`, 303);
+});
+
+/** The "Rebuild now" button: fetch all sources, then build today's edition in every chosen language. */
+app.post('/admin/rebuild', async (c) => {
+  if (!authorized(c)) return c.notFound();
+  const instance = await editionWorkflow(c).create({ params: { userId: READER, refresh: true } });
+  return c.redirect(`/admin?key=${encodeURIComponent(c.req.query('key')!)}&run=${encodeURIComponent(instance.id)}`, 303);
 });
 
 app.get('/admin/edition/:id', async (c) => {
@@ -112,7 +154,7 @@ app.get('/admin/edition/:id', async (c) => {
 
 app.get('/editions', async (c) => {
   const real = c.req.query('fake') === '1' || !c.env?.DB ? [] : await listEditions(c.env.DB, READER);
-  const lang = real.length ? ((await loadEdition(c.env.DB, READER))?.facts.lang ?? 'en') : options(c).lang;
+  const lang = real.length ? ((await realEdition(c))?.lang ?? 'en') : options(c).lang;
   return c.html(`<!doctype html>${ArchivePage({ lang, list: real.length ? real : fakeArchive() })}`);
 });
 
@@ -120,7 +162,7 @@ app.get('/editions/:date{\\d{4}-\\d{2}-\\d{2}}', async (c) => {
   const o = options(c);
   const date = c.req.param('date');
   const real = await realEdition(c, date);
-  if (real) return c.html(renderEdition(real, o.view, o));
+  if (real) return c.html(renderEdition(real, o.view, { ...o, nav: nav(real, `/editions/${date}`) }));
   const issue = fakeArchive().find((a) => a.date === date)?.issue;
   if (!issue) return c.notFound();
   const e = fakeEdition(o.lang, o.variant, date);

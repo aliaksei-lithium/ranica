@@ -261,6 +261,14 @@ print view. Kindle and e-mail delivery stay in the code and design but are not w
 - Compose + fit-to-page; edition HTML (and the A4 PDF from the browser session) to R2.
 - Web: `/today` (set as browser home page, readable on the phone), `/today?view=print` with a
   print button, `/editions/<date>`, archive list, behind Cloudflare Access.
+- Settings and manual control (2026-11-07): `/admin` switches the hourly fetch and the daily build
+  on and off, sets wake time and languages (English, German, or both; one editor run each), and has
+  a **Rebuild now** button (fetch all sources, then build). Editions are stored per language
+  (`migrations/0003`); the web page links the other language.
+- Layout (2026-11-07): a lead row (weather · today · insight) and one news flow in balanced CSS
+  columns (3 on the front, 2 on the back) instead of a fixed two-column grid. The editor overfills it
+  (up to 5 rubrics plus 12-24 one-liners); `public/fit.js` trims from the end, re-inserts what still
+  fits and carries one-liners that do not fit on the front to the back page, so both sheets end full.
 - Cron scheduler at your wake time builds the edition so it is ready when you open the page.
   *(Done: the hourly cron starts the edition in the hour that contains wake time − 30 min, one
   instance id per reader and day; Free plan, so no 15-minute cron.)*
@@ -284,6 +292,17 @@ so the Browser Run `/markdown` fallback for Telegram is not needed.
 | `faz-ausland` | FAZ | `https://www.faz.net/rss/aktuell/politik/ausland/` | World | 44 items, 71 kB |
 | `berliner-zeitung` | Berliner Zeitung | `https://www.berliner-zeitung.de/feed.xml` | — (all sections; editor assigns Berlin/Germany/World) | 100 items, 90 kB |
 | `tg-zerkalo` | Telegram @zerkalo_io (Зеркало, Russian) | `https://t.me/s/zerkalo_io` (public web preview, last 20 posts) | Telegram digest | 20 posts, 141 kB HTML |
+| `rbb24` | rbb24 | `https://www.rbb24.de/aktuell/index.xml/feed=rss.xml` | Berlin | 53 items, 24 kB |
+| `morgenpost-berlin` | Berliner Morgenpost | `https://www.morgenpost.de/berlin/rss` | Berlin | 100 items, 83 kB |
+| `tagesspiegel-politik` | Tagesspiegel | `https://www.tagesspiegel.de/contentexport/feed/politik` | Germany | 100 items, 91 kB |
+| `handelsblatt-top` | Handelsblatt | `https://www.handelsblatt.com/contentexport/feed/top-themen` | Business | 21 items, 38 kB |
+| `handelsblatt-finanzen` | Handelsblatt | `https://www.handelsblatt.com/contentexport/feed/finanzen` | Business | 20 items, 37 kB |
+| `tagesschau-wirtschaft` | tagesschau | `https://www.tagesschau.de/wirtschaft/index~rss2.xml` | Business | 25 items, 34 kB |
+
+The last six were added on 2026-11-07 for more Berlin, politics and business news. Berlin transport has
+no feed of its own (BVG, S-Bahn Berlin and VBB publish no RSS; their URLs return 404), so transport news
+comes from the Berlin feeds and the editor groups it under a Transport rubric when there is any.
+Telegram content stays in Russian/Belarusian on the page.
 
 FAZ's all-news feed (`/rss/aktuell/`, 262 kB, 159 items) is skipped to keep each parse well under
 the 10 ms CPU budget; the two politics sections cover Germany and World. Berliner Zeitung has no

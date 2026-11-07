@@ -1,5 +1,5 @@
 import type { Child, FC } from 'hono/jsx';
-import type { Edition } from '../model';
+import type { Edition, Lang } from '../model';
 import { dateParts } from './i18n';
 import { FrontPage } from './front';
 import { BackPage } from './back';
@@ -31,7 +31,29 @@ export const Doc: FC<{ lang: string; title: string; bodyClass: string; fit?: boo
   </html>
 );
 
-export function renderEdition(e: Edition, view: View, opts: { backPage?: boolean } = {}): string {
+/** Links above the sheets on screen: languages stored for this day, web/print view, archive. */
+export interface Nav {
+  langs: Lang[];
+  /** Path of this page without query, e.g. /today or /editions/2026-11-08. */
+  path: string;
+}
+
+const LANG_NAMES: Record<Lang, string> = { en: 'English', de: 'Deutsch' };
+
+const Toolbar: FC<{ nav: Nav; lang: Lang; view: View }> = ({ nav, lang, view }) => {
+  const q = (l: Lang, v: View) => `${nav.path}?lang=${l}${v === 'web' ? '' : `&view=${v}`}`;
+  return (
+    <nav class="toolbar">
+      {nav.langs.map((l) => (l === lang ? <strong>{LANG_NAMES[l]}</strong> : <a href={q(l, view)} hreflang={l}>{LANG_NAMES[l]}</a>))}
+      <span class="toolbar__sep" />
+      {view === 'print' ? <a href={q(lang, 'web')}>Web</a> : <a href={q(lang, 'print')}>Print view</a>}
+      {view === 'print' && <button type="button" onclick="print()">Print</button>}
+      <a href="/editions">Archive</a>
+    </nav>
+  );
+};
+
+export function renderEdition(e: Edition, view: View, opts: { backPage?: boolean; nav?: Nav } = {}): string {
   const d = dateParts(e.facts.date, e.facts.lang);
   const title = `Ranica · ${d.day} ${d.month} ${d.year} · ${e.brief.headline}`;
   const back = opts.backPage ?? true;
@@ -42,11 +64,13 @@ export function renderEdition(e: Edition, view: View, opts: { backPage?: boolean
       <FrontPage e={e} kindle />
     ) : view === 'print' ? (
       <>
+        {opts.nav && <Toolbar nav={opts.nav} lang={e.facts.lang} view={view} />}
         <FrontPage e={e} />
         {back && <BackPage e={e} />}
       </>
     ) : (
       <div class="desk desk--stack">
+        {opts.nav && <Toolbar nav={opts.nav} lang={e.facts.lang} view={view} />}
         <FrontPage e={e} />
         {back && <BackPage e={e} />}
       </div>

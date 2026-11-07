@@ -16,12 +16,19 @@ export const BriefSchema = z.object({
   weather_note: z.string().describe('One practical line (at most 120 characters) based only on the weather facts; empty if none'),
   agenda: z.array(z.object({ event_id: z.string(), note: z.string() })).describe('Notes for calendar events; empty when there are no events'),
   tasks: z.array(z.object({ task_id: z.string(), context: z.string() })).describe('Context for tasks; empty when there are no tasks'),
-  news: z.array(newsPick).describe('Front page: up to 3 rubrics with 2-3 items each, most important first; title at most 70 characters, summary one sentence of at most 140 characters'),
+  news: z.array(newsPick).describe('Front page: up to 5 rubrics with 2-4 items each, most important first; title at most 70 characters, summary one sentence of at most 140 characters'),
+  briefs: z
+    .array(z.object({
+      rubric: z.string(),
+      item_id: z.string(),
+      text: z.string().describe('The news in one line, at most 100 characters'),
+    }))
+    .describe('12-24 one-line items not used in news, grouped by rubric, most important first; they fill the rest of the page'),
   telegram_digest: z
     .array(z.object({
       channel: z.string().describe('Channel as given, e.g. "@zerkalo_io"'),
-      summary: z.string().describe('One line (at most 110 characters) about what the channel covered'),
-      points: z.array(z.string()).describe('3-5 bullet points, each at most 140 characters'),
+      summary: z.string().describe("One line (at most 110 characters) about what the channel covered, in the channel's own language"),
+      points: z.array(z.string()).describe("3-6 bullet points, each at most 140 characters, in the channel's own language"),
     }))
     .describe('One entry per input Telegram channel'),
   insight: z.string().describe('2-4 sentences, at most 400 characters, connecting facts from the input; empty rather than generic'),
@@ -42,7 +49,7 @@ export const BriefSchema = z.object({
   deep: z
     .array(z.object({ rubric: z.string(), item_id: z.string(), title: z.string(), body: z.string().describe('5-7 sentences, at most 650 characters, only facts from the item') }))
     .describe('Back page: 3-4 longer summaries of the most important front-page items'),
-  back_news: z.array(newsPick).describe('Back page: 1-2 more rubrics with 3-4 items not used on the front page'),
+  back_news: z.array(newsPick).describe('Back page: 2-4 rubrics with 3-5 items each, not used on the front page or in briefs'),
   word_of_day: z
     .object({ de: z.string(), en: z.string(), example: z.string(), extra: z.string().describe('Plural or forms, one related word') })
     .nullable(),

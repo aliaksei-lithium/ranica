@@ -21,7 +21,7 @@ const WET = new Set([51, 53, 55, 56, 57, 61, 63, 65, 66, 67, 71, 73, 75, 77, 80,
 const r = (n: number) => Math.round(n);
 const fmt = (n: number) => (r(n) > 0 ? `+${r(n)}` : r(n) < 0 ? `−${Math.abs(r(n))}` : '0');
 
-interface OpenMeteo {
+export interface OpenMeteo {
   daily: {
     time: string[]; sunrise: string[]; sunset: string[]; daylight_duration: number[];
     temperature_2m_max: number[]; temperature_2m_min: number[]; weather_code: number[]; precipitation_probability_max: number[];
@@ -103,10 +103,15 @@ export function parseWeather(json: OpenMeteo, date: string, lang: Lang): Weather
 
 const cap = (s: string) => s.charAt(0).toUpperCase() + s.slice(1);
 
+/** The raw forecast (one request); parse it per language with parseWeather. */
+export async function fetchForecast(loc: { lat: number; lon: number; timezone: string }, fetcher: typeof fetch = fetch): Promise<OpenMeteo> {
+  const res = await fetcher(forecastUrl(loc.lat, loc.lon, loc.timezone), { signal: AbortSignal.timeout(10_000) });
+  if (!res.ok) throw new Error(`Open-Meteo HTTP ${res.status}`);
+  return (await res.json()) as OpenMeteo;
+}
+
 export async function fetchWeather(
   loc: { lat: number; lon: number; timezone: string }, date: string, lang: Lang, fetcher: typeof fetch = fetch,
 ): Promise<WeatherFacts> {
-  const res = await fetcher(forecastUrl(loc.lat, loc.lon, loc.timezone), { signal: AbortSignal.timeout(10_000) });
-  if (!res.ok) throw new Error(`Open-Meteo HTTP ${res.status}`);
-  return parseWeather((await res.json()) as OpenMeteo, date, lang);
+  return parseWeather(await fetchForecast(loc, fetcher), date, lang);
 }
