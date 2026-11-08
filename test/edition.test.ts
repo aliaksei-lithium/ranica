@@ -82,7 +82,7 @@ const brief = (over: Partial<Brief> = {}): Brief => ({
 const output = (): BriefOutput => {
   const b = brief();
   return {
-    headline: b.headline, weather_note: b.weather_note, news: b.news, briefs: [], telegram_digest: b.telegram_digest,
+    headline: b.headline, news: b.news, briefs: [], telegram_digest: b.telegram_digest,
     insight: b.insight, tomorrow: b.tomorrow, deep: b.deep, back_news: b.back_news,
     new_word: { de: 'der Titel', en: 'title', example: 'Der Titel ist kurz.', from_item_id: 'n1' },
     on_this_day: { text: 'Morgenstund hat Gold im Mund.', author: 'Sprichwort' },
@@ -102,7 +102,7 @@ describe('weather', () => {
     const w = parseWeather(openMeteo() as never, DATE, 'en');
     expect(w.sun).toEqual({ sunrise: '07:13', sunset: '16:25', dayMinutes: 553, deltaMinutes: -4 });
     expect(w.weather.max).toBe(6);
-    expect(w.weather.summary).toBe('Morning +4°, feels like 0°. Cloudy, rain from 15:00, wind up to 5 m/s. Up to +6° by 14:00.');
+    expect(w.weather.summary).toBe('Cloudy, rain from 15:00. Morning +4°, feels 0°.');
     expect(w.hourly.map((h) => h.hour)).toEqual(['06', '09', '12', '15', '18', '21']);
     expect(w.hourly[3]).toMatchObject({ rainPct: 70, windMs: 5 });
     expect(w.week).toHaveLength(7);
@@ -112,7 +112,7 @@ describe('weather', () => {
 
   it('writes German and says "trocken" without rain', () => {
     const w = parseWeather(openMeteo(99) as never, DATE, 'de');
-    expect(w.weather.summary).toContain('Bewölkt, trocken, Wind bis 5 m/s');
+    expect(w.weather.summary).toBe('Bewölkt, trocken. Morgens +4°, gefühlt 0°.');
     expect(w.forEditor.rainFromHour).toBeNull();
   });
 });
@@ -327,15 +327,19 @@ describe('front page layout', () => {
       briefs: [{ rubric: 'World', item_id: 'n3', text: 'One line' }],
       insight: 'Two facts connected.',
     });
-    const html = renderEdition({ facts, brief: b }, 'print', { backPage: false, nav: { langs: ['en', 'de'], path: '/today' } });
+    const html = renderEdition({ facts, brief: b }, 'print', { backPage: true, nav: { langs: ['en', 'de'], path: '/today' } });
     const lead = html.slice(html.indexOf('class="lead"'), html.indexOf('class="flow"'));
     const flow = html.slice(html.indexOf('class="flow"'), html.indexOf('<footer'));
+    const back = html.slice(html.indexOf('sheet--page2'));
     expect(lead).toContain('data-block="insight"');
     expect(flow.indexOf('id="germany"')).toBeLessThan(flow.indexOf('id="berlin"'));
     expect(flow.indexOf('id="berlin"')).toBeLessThan(flow.indexOf('One line'));
     expect(html.match(/data-block="newsextra"/g)).toHaveLength(1);
     expect(html.match(/data-block="brief"/g)).toHaveLength(1);
-    expect(flow).toContain('lang="ru"'); // the Russian Telegram digest keeps its language
+    expect(flow).not.toContain('From Telegram'); // Telegram and the German word are on the back page now
+    expect(flow).not.toContain('der Titel');
+    expect(back).toContain('class="digest__list" lang="ru"'); // the Russian digest keeps its language
+    expect(back).toContain('der Titel');
     expect(html).toContain('href="/today?lang=de&amp;view=print"');
   });
 });

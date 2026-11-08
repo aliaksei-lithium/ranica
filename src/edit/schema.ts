@@ -14,7 +14,8 @@ const newsPick = z.object({
 // Kept small on purpose: structured outputs compile the schema into a grammar with a size limit
 // ("compiled grammar is too large", 2026-11-07). So no nullable objects (an empty string means
 // "none"), and no fields without input yet (agenda, tasks, vocabulary cards, sport, hobby): toBrief
-// fills those. Add them back here when calendar, tasks and vocabulary arrive.
+// fills those. Add them back here when calendar, tasks and vocabulary arrive. weather_note is not
+// written any more (review 2026-11-08: less weather on the page).
 const word = z.object({
   de: z.string().describe('German word, nouns with article; empty string if none'),
   en: z.string(),
@@ -23,15 +24,14 @@ const word = z.object({
 
 export const BriefSchema = z.object({
   headline: z.string().describe('The day in at most 60 characters; becomes the page title'),
-  weather_note: z.string().describe('One practical line (at most 120 characters) based only on the weather facts; empty if none'),
-  news: z.array(newsPick).describe('Front page: up to 5 rubrics with 2-4 items each, most important first; title at most 70 characters, summary one sentence of at most 140 characters'),
+  news: z.array(newsPick).describe('Front page: up to 4 rubrics with 2-3 items each, most important first; title at most 70 characters, summary one sentence of at most 140 characters'),
   briefs: z
     .array(z.object({
       rubric: z.string(),
       item_id: z.string(),
       text: z.string().describe('The news in one line, at most 100 characters'),
     }))
-    .describe('12-24 one-line items not used in news, grouped by rubric, most important first; they fill the rest of the page'),
+    .describe('4-8 one-line items with real news value, not used in news, grouped by rubric, most important first'),
   telegram_digest: z
     .array(z.object({
       channel: z.string().describe('Channel as given, e.g. "@zerkalo_io"'),
@@ -58,6 +58,7 @@ export function toBrief(o: BriefOutput): Brief {
   const { new_word, on_this_day, word_of_day, ...rest } = o;
   return {
     ...rest,
+    weather_note: '',
     agenda: [],
     tasks: [],
     sport: null,

@@ -25,11 +25,11 @@ export function fallbackBrief(input: EditorInput): Brief {
       .slice(0, n)
       .map((i) => (used.add(i.id), { rubric: R[rubric], item_id: i.id, title: clip(i.title, 80), summary: clip(i.body, 120) }));
 
-  const news = [...pick('Berlin', 4), ...pick('Germany', 4), ...pick('World', 3), ...pick('Business', 3)];
+  const news = [...pick('Berlin', 3), ...pick('Germany', 3), ...pick('World', 3), ...pick('Business', 2)];
   const briefs = (['Berlin', 'Germany', 'Business', 'World'] as Key[]).flatMap((rubric) =>
     pool
       .filter((i) => rubricOf(i) === rubric && !used.has(i.id))
-      .slice(0, 5)
+      .slice(0, 2)
       .map((i) => (used.add(i.id), { rubric: R[rubric], item_id: i.id, text: clip(i.title, 100) })),
   );
   const backNews = [...pick('World', 4), ...pick('Business', 3), ...pick('Germany', 3), ...pick('Berlin', 3)];

@@ -37,7 +37,7 @@ export function validateBrief(b: Brief, known: KnownIds): Validation {
   const front = new Set<string>();
   const news = picks(b.news, front, 80, 170, 4);
   const briefs = keep(b.briefs ?? [], (x) => known.items.has(x.item_id) && !front.has(x.item_id) && !!front.add(x.item_id), (x) => `brief ${x.item_id}`)
-    .slice(0, 24)
+    .slice(0, 8)
     .map((x) => ({ ...x, rubric: clip(x.rubric, 24), text: clip(x.text, 110) }));
   const back = new Set<string>(front);
   const backNews = picks(b.back_news, back, 100, 320, 5);

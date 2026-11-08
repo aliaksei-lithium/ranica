@@ -20,9 +20,13 @@ export const BackPage: FC<{ e: Edition }> = ({ e }) => {
     deep.set(x.rubric, [...(deep.get(x.rubric) ?? []), { title: x.title, body: x.body, tag }]);
   }
   const back = rubrics(e, b.back_news, 4, 5);
+  const cardsById = new Map(f.cards.map((c) => [c.id, c]));
+  const cards = b.german.cards.flatMap((c) => {
+    const card = cardsById.get(c.card_id);
+    return card ? [{ ...card, example: c.example }] : [];
+  }).slice(0, 5);
   const posts = new Map(f.telegram.map((c) => [c.channel, c.posts]));
   const [rowWeather, rowCalendar, rowDue] = L.weekRows;
-  const [colTime, rowTemp, rowFeels, rowRain, rowWind] = L.hourRows;
 
   return (
     <article class="sheet sheet--page2" lang={f.lang}>
@@ -83,39 +87,6 @@ export const BackPage: FC<{ e: Edition }> = ({ e }) => {
                     ))}
                   </tr>
                 )}
-              </tbody>
-            </table>
-          </section>
-        )}
-        {f.hourly.length > 0 && (
-          <section class="section section--hours" {...fit('hours')}>
-            <span class="label">{L.hours}</span>
-            <table class="table hours">
-              <thead>
-                <tr>
-                  <th>{colTime}</th>
-                  {f.hourly.map((h) => (
-                    <th>{h.hour}</th>
-                  ))}
-                </tr>
-              </thead>
-              <tbody>
-                <tr>
-                  <th scope="row">{rowTemp}</th>
-                  {f.hourly.map((h) => <td class="num">{signed(h.temp)}°</td>)}
-                </tr>
-                <tr>
-                  <th scope="row">{rowFeels}</th>
-                  {f.hourly.map((h) => <td class="num">{signed(h.feels)}°</td>)}
-                </tr>
-                <tr>
-                  <th scope="row">{rowRain}</th>
-                  {f.hourly.map((h) => <td class="num">{h.rainPct} %</td>)}
-                </tr>
-                <tr>
-                  <th scope="row">{rowWind}</th>
-                  {f.hourly.map((h) => <td class="num">{h.windMs}</td>)}
-                </tr>
               </tbody>
             </table>
           </section>
@@ -192,11 +163,13 @@ export const BackPage: FC<{ e: Edition }> = ({ e }) => {
           </section>
       </div>
 
-      {(f.weekWords.length > 0 || b.word_of_day) && (
+      {/* German: word of the day, the new word from today's news (moved here from the front page,
+          review 2026-11-08) and the week's words once vocabulary exists. */}
+      {(f.weekWords.length > 0 || b.word_of_day || b.german.new_word || cards.length > 0) && (
         <section class="lesson lesson--words" lang="de" {...fit('words')}>
           <span class="label" lang={f.lang}>
-            {L.words}
-            <span class="label__sub">{f.weekWords.length}</span>
+            {f.weekWords.length > 0 ? L.words : L.german}
+            {f.weekWords.length > 0 && <span class="label__sub">{f.weekWords.length}</span>}
           </span>
           <div class="words-strip">
             {b.word_of_day ? (
@@ -211,6 +184,25 @@ export const BackPage: FC<{ e: Edition }> = ({ e }) => {
               <div />
             )}
             <div class="words">
+              {b.german.new_word && (
+                <div class="words__new">
+                  <span class="lesson__new-label" lang={f.lang}>{L.newWord}</span>
+                  <p>
+                    <span class="lesson__word">{b.german.new_word.de}</span>
+                    <span class="lesson__gloss" lang={f.lang}>{b.german.new_word.en}</span>
+                  </p>
+                  <p class="lesson__example">{b.german.new_word.example}</p>
+                </div>
+              )}
+              {cards.map((c) => (
+                <div class="words__new">
+                  <p>
+                    <span class="lesson__word">{c.de}</span>
+                    <span class="lesson__gloss" lang={f.lang}>{c.en}</span>
+                  </p>
+                  <p class="lesson__example">{c.example}</p>
+                </div>
+              ))}
               {f.weekWords.map((w) => (
                 <p>
                   <span class="lesson__word">{w.de}</span>

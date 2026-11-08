@@ -70,20 +70,18 @@ export function parseWeather(json: OpenMeteo, date: string, lang: Lang): Weather
   const h = json.hourly;
   const day = hours.filter((k) => { const hh = +h.time[k]!.slice(11, 13); return hh >= 7 && hh <= 21; });
   const morning = at('08') ?? day[0]!;
-  const peak = day.reduce((a, b) => (h.temperature_2m[b]! > h.temperature_2m[a]! ? b : a), day[0]!);
-  const windMax = r(Math.max(...day.map((k) => h.wind_speed_10m[k]!)));
   const rainHour = day.find((k) => h.precipitation_probability[k]! >= 50 || WET.has(h.weather_code[k]!) && h.precipitation_probability[k]! >= 30);
   const skyToday = sky(d.weather_code[i]!, lang);
   const rainFromHour = rainHour === undefined ? null : time(h.time[rainHour]!);
 
   const wetDay = WET.has(d.weather_code[i]!);
   const dry = { en: wetDay ? 'mostly dry' : 'dry', de: wetDay ? 'meist trocken' : 'trocken' }[lang];
+  // Short on purpose (2026-11-08 review): the big number is the day's high; one line adds sky,
+  // rain and the morning. Hourly details stay out of the page.
   const summary =
     lang === 'de'
-      ? `Morgens ${fmt(h.temperature_2m[morning]!)}°, gefühlt ${fmt(h.apparent_temperature[morning]!)}°. ${cap(skyToday)}, ` +
-        `${rainFromHour ? `Regen ab ${rainFromHour}` : dry}, Wind bis ${windMax} m/s. Bis ${time(h.time[peak]!)} ${fmt(h.temperature_2m[peak]!)}°.`
-      : `Morning ${fmt(h.temperature_2m[morning]!)}°, feels like ${fmt(h.apparent_temperature[morning]!)}°. ${cap(skyToday)}, ` +
-        `${rainFromHour ? `rain from ${rainFromHour}` : dry}, wind up to ${windMax} m/s. Up to ${fmt(h.temperature_2m[peak]!)}° by ${time(h.time[peak]!)}.`;
+      ? `${cap(skyToday)}, ${rainFromHour ? `Regen ab ${rainFromHour}` : dry}. Morgens ${fmt(h.temperature_2m[morning]!)}°, gefühlt ${fmt(h.apparent_temperature[morning]!)}°.`
+      : `${cap(skyToday)}, ${rainFromHour ? `rain from ${rainFromHour}` : dry}. Morning ${fmt(h.temperature_2m[morning]!)}°, feels ${fmt(h.apparent_temperature[morning]!)}°.`;
 
   const week = d.time.slice(i, i + 7).map((t, n) => ({
     date: t, hi: r(d.temperature_2m_max[i + n]!), lo: r(d.temperature_2m_min[i + n]!),

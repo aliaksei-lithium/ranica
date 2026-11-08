@@ -23,7 +23,7 @@ describe('M0 routes with fake data', () => {
     expect(body).toContain('class="desk desk--stack"');
     expect(count(body, /<article class="sheet[ "]/g)).toBe(2);
     expect(body).toContain('sheet sheet--page2');
-    for (const block of ['masthead', 'sun', 'weather', 'today', 'sport', 'german', 'hobby', 'onthisday', 'news', 'telegram', 'qr', 'insight', 'footer', 'week', 'hours', 'depth', 'world', 'digest', 'upcoming', 'words']) {
+    for (const block of ['masthead', 'sun', 'weather', 'today', 'sport', 'hobby', 'onthisday', 'news', 'qr', 'insight', 'footer', 'week', 'depth', 'world', 'digest', 'upcoming', 'words']) {
       expect(body).toContain(`data-block="${block}"`);
     }
     expect(body).toContain('Tuesday · 2026');
@@ -34,7 +34,7 @@ describe('M0 routes with fake data', () => {
   it('renders the German edition', async () => {
     const { body } = await get('/today?lang=de');
     expect(body).toContain('lang="de"');
-    expect(body).toContain('Deutsch heute');
+    expect(body).toContain('Wort des Tages'); // the German block is on the back page
     expect(body).toContain('Einblick des Tages');
     expect(body).toContain('Dienstag, 3. November 2026');
     expect(body).toContain('Rückseite');
@@ -68,7 +68,7 @@ describe('M0 routes with fake data', () => {
     const { body } = await get('/today');
     expect(body).toContain('href="https://ranica.app/today#tech"');
     expect(body).toContain('id="tech"');
-    expect(count(body, /aria-label="QR code"/g)).toBe(3);
+    expect(count(body, /aria-label="QR code"/g)).toBe(2); // one per front rubric
   });
 
   it('falls back to defaults on unknown query values', async () => {

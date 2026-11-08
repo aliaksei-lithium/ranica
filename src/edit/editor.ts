@@ -25,7 +25,7 @@ You receive today's facts (date, weather, calendar, tasks) and news items collec
 
 What makes a good page:
 - The reader lives in Berlin, works in software and is learning German. Choose what matters to them today. Priorities, in order: politics (Berlin, Germany, Europe), local Berlin news, Berlin transport (BVG, S-Bahn, U-Bahn, trams, roads, strikes, closures, construction), business and finance (markets, interest rates, big companies, the Berlin economy), and the biggest world stories. Leave out noise (celebrity, crime without wider relevance, live tickers without news).
-- The printed page has no empty space: give it plenty of material. Fill news, briefs and back_news generously from the input.
+- Quality over quantity: the front page should read calmly. Every item must matter to the reader; leave out sport results, gossip and trivia unless they are big news.
 - Prefer items that several sources cover; merge duplicates into one pick and use the most informative item's id.
 - Write titles and summaries yourself in the reader's language. Keep the facts of the item; never add facts, numbers, names or quotes that are not in the input. If an item's text is too thin to summarise, use its title faithfully.
 - Russian and Belarusian content stays in its own language: write the Telegram digest (summary and points) in the language of the channel's posts, not in the reader's language.
@@ -33,13 +33,13 @@ What makes a good page:
 Rules:
 - Use only ids that appear in the input (items "n…", events "e…", tasks "t…", cards "c…"). Do not invent ids or events.
 - Rubrics (in German): Berlin, Transport (Verkehr), Germany (Deutschland), World (Welt), Business (Wirtschaft). Use Transport only when there are transport items.
-- news (front page): up to 5 rubrics, 2-4 items each, the most important rubric and item first. A title of at most 70 characters and a one-sentence summary of at most 140 characters per item.
-- briefs (front page): 12-24 more items as one-liners of at most 100 characters, not used in news, grouped by rubric. They fill whatever room is left on the sheet.
+- news (front page): up to 4 rubrics, 2-3 items each, the most important rubric and item first. A title of at most 70 characters and a one-sentence summary of at most 140 characters per item.
+- briefs (front page): 4-8 more items as one-liners of at most 100 characters, not used in news, only ones with real news value (a decision, a change, a number that matters), grouped by rubric.
 - deep (back page): 3-4 longer summaries of the most important front-page items, written from the item text only.
 - back_news (back page): 2-4 rubrics with 3-5 items each, not used in news or briefs.
 - headline: the day in a few words, not clickbait.
 - insight: connect two or more facts from the input into something useful for the reader today. If nothing connects, return an empty string; never write generic advice.
-- weather_note and tomorrow: only from the weather facts.
+- tomorrow: only from the weather facts.
 - When the reader language is "en", write English. When it is "de", write German at the reader's learner level: short sentences (under about 15 words), common words, and a short English gloss in parentheses for a rare word.
 - new_word: one useful word at the reader's level that appears in a German-language item; nouns with article. word_of_day: another useful word with forms and a related word.
 - on_this_day: a well-known German proverb or quote that fits the season or the day.

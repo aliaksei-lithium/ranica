@@ -1,7 +1,7 @@
 // Page 1 (docs/03-design-brief.md, A–L). Layout since 2026-11-08: a lead row (weather · today ·
-// insight) and a news flow in three CSS columns that the browser balances. The flow is overfilled on
-// purpose; public/fit.js removes the lowest-priority blocks from its end until the A4 sheet fits, so
-// the page has no empty space and nothing is laid out by hand.
+// insight) and the news in two balanced CSS columns, like the back page: rubrics with full items,
+// then a few one-liners. Calm on purpose (review 2026-11-08): no German word, Telegram or weather
+// advice here; those live on the back page. public/fit.js trims from the end if the sheet overflows.
 import type { FC } from 'hono/jsx';
 import type { Edition } from '../model';
 import type { NewsPick } from '../edit/brief';
@@ -12,6 +12,9 @@ import { qrSvg } from './qr';
 
 /** Russian / Belarusian text keeps its own lang attribute (hyphenation, screen readers). */
 export const cyrillic = (s: string) => /[\u0400-\u04FF]/.test(s);
+
+/** One-liners on the front page: a few meaningful ones, not a feed. */
+const MAX_BRIEFS = 6;
 
 type Rubric = { name: string; items: (NewsPick & { source: string; url: string })[] };
 
@@ -60,12 +63,6 @@ export const FrontPage: FC<{ e: Edition; kindle?: boolean }> = ({ e, kindle }) =
   const L = t(f.lang);
   const notes = new Map(b.agenda.map((a) => [a.event_id, a.note]));
   const contexts = new Map(b.tasks.map((x) => [x.task_id, x.context]));
-  const cardsById = new Map(f.cards.map((c) => [c.id, c]));
-  const cards = b.german.cards.flatMap((c) => {
-    const card = cardsById.get(c.card_id);
-    return card ? [{ ...card, example: c.example }] : [];
-  }).slice(0, 5);
-  const nw = b.german.new_word;
   const news = rubrics(e, b.news, 5);
   const itemsById = new Map(f.items.map((i) => [i.id, i]));
   const briefs = (b.briefs ?? []).flatMap((x) => {
@@ -73,39 +70,8 @@ export const FrontPage: FC<{ e: Edition; kindle?: boolean }> = ({ e, kindle }) =
     return item ? [{ ...x, url: item.url, source: item.source }] : [];
   });
   const deepRubrics = new Set(b.deep.map((d) => d.rubric));
-  const telegram = b.telegram_digest.slice(0, 2);
   const base = `https://${f.url}`;
-  const qrTargets = [...news.map((r) => r.name), ...(telegram.length ? [L.telegram] : [])].slice(0, 5);
-
-  const lesson = (cards.length > 0 || nw) && (
-    <section class="lesson" lang="de" {...fit('german')}>
-      <span class="label">
-        {L.german}
-        <span class="label__sub">{L.germanSub(cards.length, !!nw)}</span>
-      </span>
-      <div class="lesson__grid">
-        {cards.map((c) => (
-          <div class="lesson__entry">
-            <p>
-              <span class="lesson__word">{c.de}</span>
-              <span class="lesson__gloss" lang={f.lang}>{c.en}</span>
-            </p>
-            <p class="lesson__example">{c.example}</p>
-          </div>
-        ))}
-        {nw && (
-          <div class="lesson__entry lesson__new">
-            <span class="lesson__new-label" lang={f.lang}>{L.newWord}</span>
-            <p>
-              <span class="lesson__word">{nw.de}</span>
-              <span class="lesson__gloss" lang={f.lang}>{nw.en}</span>
-            </p>
-            <p class="lesson__example">{nw.example}</p>
-          </div>
-        )}
-      </div>
-    </section>
-  );
+  const qrTargets = news.map((r) => r.name).slice(0, 5);
 
   return (
     <article class={kindle ? 'sheet sheet--kindle' : 'sheet'} lang={f.lang}>
@@ -122,7 +88,6 @@ export const FrontPage: FC<{ e: Edition; kindle?: boolean }> = ({ e, kindle }) =
               <span class="weather__temp">{signed(f.weather.max)}°</span>
               <div class="weather__text">
                 <p>{f.weather.summary}</p>
-                {b.weather_note && <p class="weather__advice">{b.weather_note}</p>}
               </div>
             </div>
           ) : (
@@ -176,13 +141,11 @@ export const FrontPage: FC<{ e: Edition; kindle?: boolean }> = ({ e, kindle }) =
           )}
         </section>
 
-        {b.insight ? (
+        {b.insight && (
           <aside class="insight insight--lead" {...fit('insight')}>
             <span class="label">{L.insight}</span>
             <p>{b.insight}</p>
           </aside>
-        ) : (
-          lesson
         )}
       </div>
 
@@ -190,23 +153,11 @@ export const FrontPage: FC<{ e: Edition; kindle?: boolean }> = ({ e, kindle }) =
         {news.map((r) => (
           <NewsRubric r={r} more={deepRubrics.has(r.name) ? L.morePage2 : undefined} />
         ))}
-        {b.insight && lesson}
-        {telegram.length > 0 && (
-          <section class="rubric" id={slug(L.telegram)} {...fit('telegram')}>
-            <span class="label">{L.telegram}</span>
-            {telegram.map((tg) => (
-              <article class="item">
-                <span class="item__title">{tg.channel}</span>
-                <p class="item__summary" lang={cyrillic(tg.summary) ? 'ru' : undefined}>{tg.summary}</p>
-              </article>
-            ))}
-          </section>
-        )}
         {briefs.length > 0 && (
           <section class="rubric briefs" data-fit-empty="li">
             <span class="label">{L.briefs}</span>
             <ul class="briefs__list">
-              {briefs.map((x) => (
+              {briefs.slice(0, MAX_BRIEFS).map((x) => (
                 <li {...fit('brief')}>
                   <span class="briefs__rubric">{x.rubric}</span> <a href={x.url}>{x.text}</a>
                   <span class="tag">{x.source}</span>

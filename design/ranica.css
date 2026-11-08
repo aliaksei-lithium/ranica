@@ -14,7 +14,7 @@
   /* type scale (print) — see tokens.json › type */
   --fs-date: 66pt;      --lh-date: 0.82;
   --fs-month: 22pt;     --lh-month: 1;
-  --fs-wordmark: 18pt;
+  --fs-wordmark: 50pt;  /* the nameplate: as big as a newspaper title (was 18pt) */
   --fs-weather: 42pt;
   --fs-headline: 10.5pt; --lh-headline: 12pt;
   --fs-body: 9.4pt;      --lh-body: 11.6pt;
@@ -85,10 +85,10 @@
 .masthead__wordmark {
   display: block;
   font-family: var(--font-display);
-  font-weight: 700;
+  font-weight: 900;
   font-size: var(--fs-wordmark);
-  line-height: 1;
-  letter-spacing: 0.02em;
+  line-height: 0.82;
+  letter-spacing: -0.01em;
 }
 .masthead__title {
   display: block;
@@ -144,10 +144,10 @@
 .col--right { padding-left: var(--gutter); border-left: var(--rule-hair) solid var(--rule-light); }
 
 /* ---------- Lead row and news flow (since 2026-11-08) ----------
-   The front page is: masthead, sun line, a lead row (weather · today · insight), then one flow of
-   rubrics, one-liners and small blocks in balanced CSS columns. The flow is overfilled; public/fit.js
-   removes the lowest-priority blocks from its end until the sheet fits, so no space stays empty and
-   no layout is computed in code. The back page uses the same flow in two columns. */
+   The front page is: masthead, sun line, a lead row (weather · today · insight), then the news in
+   two balanced CSS columns: rubrics with full items, then a few one-liners. The back page uses the
+   same flow. If a sheet overflows, public/fit.js removes the lowest-priority blocks from the end;
+   no layout is computed in code. */
 .lead {
   /* Flexible: blocks share the width by weight; a missing block (no insight) gives its room away. */
   display: flex;
@@ -166,18 +166,24 @@
 .lead .lesson { margin-top: var(--space-2); }
 .lead .lesson__grid { grid-template-columns: 1fr; }
 .flow {
-  columns: 3;
-  column-gap: var(--gutter);
+  columns: 2;
+  column-gap: calc(var(--gutter) * 1.6);
   column-rule: var(--rule-hair) solid var(--rule-light);
-  margin-top: var(--space-1);
+  /* Space above the columns is padding, not the first block's margin: browsers drop margins at
+     column breaks, so a margin would push only the first column down. */
+  padding-top: var(--space-2);
   align-self: start;
 }
-.flow--2 { columns: 2; margin-top: var(--space-2); border-top: var(--rule-medium) solid var(--rule); }
+.flow--2 { margin-top: var(--space-2); border-top: var(--rule-medium) solid var(--rule); }
 .flow > * { break-inside: avoid; }
 .flow > .rubric, .flow > .section--depth { break-inside: auto; }
-.flow > :first-child { margin-top: var(--space-2); }
+.flow > :first-child { margin-top: 0; }
 .flow .label { break-after: avoid; }
-.flow .item, .flow .longread, .flow .digest, .flow .briefs__list li { break-inside: avoid; }
+/* Text may continue in the next column (title kept with its first lines), so balancing is smooth
+   and fit.js can add or remove a single line without a whole block jumping columns. */
+.flow .item, .flow .longread, .flow .digest { break-inside: auto; orphans: 2; widows: 2; }
+.flow .item__title, .flow .longread__title, .flow .digest__channel { break-after: avoid; }
+.flow .briefs__list li { break-inside: avoid; }
 .flow .lesson__grid { grid-template-columns: 1fr; }
 .flow .qr-strip { margin-top: var(--space-3); }
 .flow .qr-strip__codes { flex-wrap: wrap; row-gap: var(--space-1); }
@@ -426,8 +432,10 @@
 /* ---------- Page 2: the back page ---------- */
 .sheet--page2 { grid-template-rows: auto auto 1fr auto auto; }
 .masthead--page2 { padding-bottom: var(--space-1); }
-.masthead--page2 .masthead__month { font-size: var(--fs-wordmark); }
-.page2-top { display: grid; grid-template-columns: 1fr 58mm; column-gap: var(--gutter); margin-top: var(--space-2); }
+.masthead--page2 .masthead__month { font-size: 18pt; }
+.masthead--page2 .masthead__wordmark { font-size: 22pt; line-height: 1; }
+.page2-top { display: grid; grid-template-columns: 1fr; column-gap: var(--gutter); margin-top: var(--space-2); } /* the week; no hourly table (review 2026-11-08) */
+.words__new { grid-column: 1 / -1; margin-bottom: var(--space-1); }
 .sheet--page2 .columns { grid-template-columns: 1fr 1fr; margin-top: var(--space-2); border-top: var(--rule-medium) solid var(--rule); }
 .sheet--page2 .col--right { padding-left: var(--gutter); }
 .sheet--page2 .col--left { padding-right: var(--gutter); }
@@ -514,10 +522,9 @@
   .sheet .lead > * { width: 100%; }
   .sheet .flow, .sheet .flow--2 { columns: 1; }
 }
-/* Tablet / narrow desktop window: two flow columns. */
+/* Tablet / narrow desktop window. */
 @media screen and (min-width: 641px) and (max-width: 900px) {
   .desk .sheet { zoom: 1; }
-  .sheet .flow { columns: 2; }
 }
 .sheet--phone { width: 100%; min-height: 0; padding: 6mm; --fs-date: 56pt; }
 .sheet--phone .columns { grid-template-columns: 1fr; }
@@ -535,7 +542,7 @@
 /* ---------- Kindle: 6.8" e-reader PDF, 1236 × 1648 px, grey-scale ---------- */
 .sheet--kindle {
   --page-w: 1236px; --page-h: 1648px; --margin: 48px; --gutter: 0px;
-  --fs-date: 108pt; --fs-month: 36pt; --fs-wordmark: 28pt; --fs-weather: 64pt;
+  --fs-date: 108pt; --fs-month: 36pt; --fs-wordmark: 80pt; --fs-weather: 64pt;
   --fs-headline: 16.5pt; --lh-headline: 20pt;
   --fs-body: 14pt; --lh-body: 18.5pt;
   --fs-insight: 15pt; --lh-insight: 20pt;
