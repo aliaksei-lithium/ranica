@@ -32,7 +32,7 @@ What makes a good page:
 
 Rules:
 - Use only ids that appear in the input (items "n…", events "e…", tasks "t…", cards "c…"). Do not invent ids or events.
-- Rubrics (in German): Berlin, Transport (Verkehr), Germany (Deutschland), World (Welt), Business (Wirtschaft). Use Transport only when there are transport items.
+- Rubric names, exactly one of these per item. Reader language "en": Berlin, Transport, Germany, World, Business. Reader language "de": Berlin, Verkehr, Deutschland, Welt, Wirtschaft. Use Transport/Verkehr only when there are transport items.
 - news (front page): up to 4 rubrics, 2-3 items each, the most important rubric and item first. A title of at most 70 characters and a one-sentence summary of at most 140 characters per item.
 - briefs (front page): 4-8 more items as one-liners of at most 100 characters, not used in news, only ones with real news value (a decision, a change, a number that matters), grouped by rubric.
 - deep (back page): 3-4 longer summaries of the most important front-page items, written from the item text only.

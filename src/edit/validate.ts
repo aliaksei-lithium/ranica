@@ -3,7 +3,16 @@
 import type { Brief, NewsPick } from './brief';
 import { clip } from '../collect/text';
 
+/** "Germany/Deutschland" → the part in the reader's language (Sonnet once wrote both, 2026-11-08). */
+export function rubricName(name: string, lang?: 'en' | 'de'): string {
+  const parts = name.split('/').map((p) => p.trim()).filter(Boolean);
+  if (parts.length < 2) return name.trim();
+  return (lang === 'de' ? parts[1] : parts[0])!;
+}
+
 export interface KnownIds {
+  /** Reader language, to clean up rubric names. */
+  lang?: 'en' | 'de';
   items: Set<string>;
   events: Set<string>;
   tasks: Set<string>;
@@ -29,7 +38,7 @@ export function validateBrief(b: Brief, known: KnownIds): Validation {
         count.set(n.rubric, k);
         return k <= perRubric || (dropped.push(`over limit ${n.item_id}`), false);
       })
-      .map((n) => ({ ...n, rubric: clip(n.rubric, 24), title: clip(n.title, title), summary: clip(n.summary, summary) }));
+      .map((n) => ({ ...n, rubric: clip(rubricName(n.rubric, known.lang), 24), title: clip(n.title, title), summary: clip(n.summary, summary) }));
   };
 
   // Front page: at most 4 items per rubric (fit.js trims the 3rd/4th first), short summaries;
@@ -38,7 +47,7 @@ export function validateBrief(b: Brief, known: KnownIds): Validation {
   const news = picks(b.news, front, 80, 170, 4);
   const briefs = keep(b.briefs ?? [], (x) => known.items.has(x.item_id) && !front.has(x.item_id) && !!front.add(x.item_id), (x) => `brief ${x.item_id}`)
     .slice(0, 8)
-    .map((x) => ({ ...x, rubric: clip(x.rubric, 24), text: clip(x.text, 110) }));
+    .map((x) => ({ ...x, rubric: clip(rubricName(x.rubric, known.lang), 24), text: clip(x.text, 110) }));
   const back = new Set<string>(front);
   const backNews = picks(b.back_news, back, 100, 320, 5);
   const nw = b.german.new_word;
@@ -64,7 +73,7 @@ export function validateBrief(b: Brief, known: KnownIds): Validation {
       tomorrow: clip(b.tomorrow, 70),
       deep: keep(b.deep, (d) => known.items.has(d.item_id), (d) => `deep ${d.item_id}`)
         .slice(0, 4)
-        .map((d) => ({ ...d, title: clip(d.title, 90), body: clip(d.body, 700) })),
+        .map((d) => ({ ...d, rubric: rubricName(d.rubric, known.lang), title: clip(d.title, 90), body: clip(d.body, 700) })),
       back_news: backNews,
     },
     dropped,

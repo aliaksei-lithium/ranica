@@ -106,6 +106,7 @@ export class EditionWorkflow extends WorkflowEntrypoint<Env, EditionParams> {
 
       const llm = edited.error === null ? edited : null;
       const { brief, dropped } = validateBrief(llm ? llm.brief : fallbackBrief(input), {
+        lang,
         items: new Set(facts.items.map((i) => i.id)),
         events: new Set(facts.events.map((e) => e.id)),
         tasks: new Set(facts.tasks.map((t) => t.id)),

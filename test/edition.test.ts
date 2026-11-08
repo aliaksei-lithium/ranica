@@ -164,6 +164,13 @@ describe('validateBrief', () => {
   });
 });
 
+it('rubric names keep only the reader-language part', async () => {
+  const { rubricName } = await import('../src/edit/validate');
+  expect(rubricName('Germany/Deutschland', 'en')).toBe('Germany');
+  expect(rubricName('World / Welt', 'de')).toBe('Welt');
+  expect(rubricName('Berlin', 'de')).toBe('Berlin');
+});
+
 describe('fallback editor', () => {
   it('picks newest items per rubric, Berliner Zeitung under Berlin; Telegram stays Russian', () => {
     const b = fallbackBrief(buildEditorInput(reader, DATE, items, parseWeather(openMeteo() as never, DATE, 'en')));
