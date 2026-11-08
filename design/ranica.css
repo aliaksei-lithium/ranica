@@ -183,7 +183,7 @@
    and fit.js can add or remove a single line without a whole block jumping columns. */
 .flow .item, .flow .longread, .flow .digest { break-inside: auto; orphans: 2; widows: 2; }
 .flow .item__title, .flow .longread__title, .flow .digest__channel { break-after: avoid; }
-.flow .briefs__list li { break-inside: avoid; }
+.flow .briefs__list li, .flow .item__summary { break-inside: avoid; } /* a source tag never starts a column alone */
 .flow .lesson__grid { grid-template-columns: 1fr; }
 .flow .qr-strip { margin-top: var(--space-3); }
 .flow .qr-strip__codes { flex-wrap: wrap; row-gap: var(--space-1); }

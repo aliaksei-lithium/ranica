@@ -20,6 +20,8 @@ export const BackPage: FC<{ e: Edition }> = ({ e }) => {
     deep.set(x.rubric, [...(deep.get(x.rubric) ?? []), { title: x.title, body: x.body, tag }]);
   }
   const back = rubrics(e, b.back_news, 4, 5);
+  // The 3rd and later in-depth pieces may be trimmed before the German block and Telegram digest.
+  const deepIndex = new Map([...deep.values()].flat().map((x, i) => [x, i] as const));
   const cardsById = new Map(f.cards.map((c) => [c.id, c]));
   const cards = b.german.cards.flatMap((c) => {
     const card = cardsById.get(c.card_id);
@@ -102,7 +104,7 @@ export const BackPage: FC<{ e: Edition }> = ({ e }) => {
                 <div class="rubric rubric--deep">
                   <span class="label">{rubric}</span>
                   {list.map((x) => (
-                    <article class="longread">
+                    <article class="longread" {...((deepIndex.get(x) ?? 0) >= 2 ? fit('newsextra') : {})}>
                       <span class="longread__title">{x.title}</span>
                       <p class="longread__body">
                         {x.body}

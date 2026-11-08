@@ -28,8 +28,9 @@ export const PRIORITY: Record<BlockId, 1 | 2 | 3 | 4 | 5> = {
   hours: 3,
   world: 3,
   upcoming: 3,
-  digest: 4,
-  words: 4,
+  digest: 3,
+  /** German block on the back page (word of the day, new word, cards): kept over extra long reads. */
+  words: 3,
 };
 
 /** Attributes the fit loop reads. */
