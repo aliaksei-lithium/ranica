@@ -117,7 +117,8 @@ export function buildFacts(opts: {
     items: opts.items.map((i) => ({ id: itemId(i), source: TELEGRAM.get(i.sourceId) ?? i.source, url: i.link ?? i.url })),
     cards: [],
     telegram: [...telegramCounts].map(([channel, posts]) => ({ channel, posts })),
-    week: (weather?.week ?? []).map((w) => ({ date: w.date, hi: w.hi, lo: w.lo, sky: w.sky, events: 0, calendar: '', due: null })),
+    // The next three days (tomorrow to +3); the whole week was too wide on a phone.
+    week: (weather?.week ?? []).slice(1, 4).map((w) => ({ date: w.date, hi: w.hi, lo: w.lo, sky: w.sky, events: 0, calendar: '', due: null })),
     hourly: weather?.hourly ?? [],
     upcoming: [],
     weekWords: [],

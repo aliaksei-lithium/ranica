@@ -28,7 +28,7 @@ describe('M0 routes with fake data', () => {
     }
     expect(body).toContain('Tuesday · 2026');
     expect(body).toContain('leave by 12:20, U8 takes 18 min');
-    expect(body).toContain('more on page 2');
+    expect(body).not.toContain('more on page 2'); // long articles are on the front, nothing continues on page 2
   });
 
   it('renders the German edition', async () => {

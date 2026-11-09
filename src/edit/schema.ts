@@ -5,10 +5,10 @@ import { z } from 'zod';
 import type { Brief } from './brief';
 
 const newsPick = z.object({
-  rubric: z.string().describe('Rubric name in the reader language, e.g. Berlin, Germany/Deutschland, World/Welt'),
+  rubric: z.string().describe('One rubric name from the list for the reader language, e.g. Germany (en) or Deutschland (de)'),
   item_id: z.string().describe('id of an input item, e.g. "n12"'),
   title: z.string().describe('Headline in the reader language, at most 90 characters'),
-  summary: z.string().describe('At most 2 short sentences (about 200 characters) in the reader language'),
+  summary: z.string().describe('One or two sentences, at most 180 characters: what happened and its outcome or the stated view'),
 });
 
 // Kept small on purpose: structured outputs compile the schema into a grammar with a size limit
@@ -29,9 +29,9 @@ export const BriefSchema = z.object({
     .array(z.object({
       rubric: z.string(),
       item_id: z.string(),
-      text: z.string().describe('The news in one line, at most 100 characters'),
+      text: z.string().describe('What happened and its outcome or meaning, one or two lines, at most 160 characters'),
     }))
-    .describe('4-8 one-line items with real news value, not used in news, grouped by rubric, most important first'),
+    .describe('4-8 stories with real news value, not used in news, grouped by rubric, most important first'),
   telegram_digest: z
     .array(z.object({
       channel: z.string().describe('Channel as given, e.g. "@zerkalo_io"'),
@@ -45,10 +45,13 @@ export const BriefSchema = z.object({
     .describe('A well-known German proverb or quote that fits the day; author or "Sprichwort"/"German proverb"'),
   tomorrow: z.string().describe('At most 60 characters about tomorrow, from the weather facts'),
   deep: z
-    .array(z.object({ rubric: z.string(), item_id: z.string(), title: z.string(), body: z.string().describe('5-7 sentences, at most 650 characters, only facts from the item') }))
-    .describe('Back page: 3-4 longer summaries of the most important front-page items'),
+    .array(z.object({ rubric: z.string(), item_id: z.string(), title: z.string(), body: z.string().describe('4-6 sentences, at most 650 characters, only from the item text') }))
+    .describe('Front page: one longer article for the first Germany item and one for the first World item, same item_id as that news item'),
   back_news: z.array(newsPick).describe('Back page: 2-4 rubrics with 3-5 items each, not used on the front page or in briefs'),
   word_of_day: word.extend({ extra: z.string().describe('Plural or forms, one related word') }),
+  glossary: z
+    .array(z.object({ de: z.string(), en: z.string() }))
+    .describe('German edition only: 10-15 hard words or phrases from the German text on this page, base form, nouns with article; empty for English'),
 });
 
 export type BriefOutput = z.infer<typeof BriefSchema>;

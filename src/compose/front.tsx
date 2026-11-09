@@ -40,21 +40,26 @@ export function rubrics(e: Edition, picks: NewsPick[], max = 5, perRubric = 4): 
  * One news rubric. Items after the second carry their own lower priority, so fit.js drops them one
  * by one before it has to drop a whole rubric, the Telegram block or the insight.
  */
-export const NewsRubric: FC<{ r: Rubric; more?: string; block?: 'news' | 'world'; id?: boolean }> = ({ r, more, block = 'news', id = true }) => (
+export const NewsRubric: FC<{ r: Rubric; more?: string; block?: 'news' | 'world'; id?: boolean; long?: Map<string, string> }> = ({ r, more, block = 'news', id = true, long }) => (
   <section class="rubric" id={id ? slug(r.name) : undefined} {...fit(block)}>
     <span class="label">
       {r.name}
       {more && <span class="label__sub">{more}</span>}
     </span>
-    {r.items.map((n, i) => (
-      <article class="item" {...(i >= 2 ? fit('newsextra') : {})}>
-        <a class="item__title" href={n.url}>{n.title}</a>
-        <p class="item__summary">
-          {n.summary}
-          <span class="tag">{n.source}</span>
-        </p>
-      </article>
-    ))}
+    {r.items.map((n, i) => {
+      // The lead story of a rubric may come with the editor's longer article (Brief.deep): it is
+      // printed here in place of the short summary, and not repeated on page 2.
+      const body = long?.get(n.item_id);
+      return (
+        <article class={body ? 'item item--long' : 'item'} {...(i >= 2 ? fit('newsextra') : {})}>
+          <a class="item__title" href={n.url}>{n.title}</a>
+          <p class={body ? 'item__summary longread__body' : 'item__summary'}>
+            {body ?? n.summary}
+            <span class="tag">{n.source}</span>
+          </p>
+        </article>
+      );
+    })}
   </section>
 );
 
@@ -69,7 +74,7 @@ export const FrontPage: FC<{ e: Edition; kindle?: boolean }> = ({ e, kindle }) =
     const item = itemsById.get(x.item_id);
     return item ? [{ ...x, url: item.url, source: item.source }] : [];
   });
-  const deepRubrics = new Set(b.deep.map((d) => d.rubric));
+  const long = new Map(b.deep.map((d) => [d.item_id, d.body]));
   const base = `https://${f.url}`;
   const qrTargets = news.map((r) => r.name).slice(0, 5);
 
@@ -151,7 +156,7 @@ export const FrontPage: FC<{ e: Edition; kindle?: boolean }> = ({ e, kindle }) =
 
       <div class="flow">
         {news.map((r) => (
-          <NewsRubric r={r} more={deepRubrics.has(r.name) ? L.morePage2 : undefined} />
+          <NewsRubric r={r} long={long} />
         ))}
         {briefs.length > 0 && (
           <section class="rubric briefs" data-fit-empty="li">

@@ -13,7 +13,10 @@ export const BackPage: FC<{ e: Edition }> = ({ e }) => {
   const d = dateParts(f.date, f.lang);
   const itemsById = new Map(f.items.map((i) => [i.id, i]));
   const deep = new Map<string, { title: string; body: string; tag: string }[]>();
-  for (const x of b.deep) {
+  // Long articles are printed on the front page with their story; page 2 only shows one whose item
+  // is not on the front (editions before 2026-11-09), so nothing appears twice.
+  const onFront = new Set(b.news.map((n) => n.item_id));
+  for (const x of b.deep.filter((d) => !onFront.has(d.item_id))) {
     const item = itemsById.get(x.item_id);
     if (!item) continue;
     const tag = item.minutes ? `${item.source} · ${item.minutes} ${L.min}` : item.source;
@@ -21,6 +24,7 @@ export const BackPage: FC<{ e: Edition }> = ({ e }) => {
   }
   const back = rubrics(e, b.back_news, 4, 5);
   // The 3rd and later in-depth pieces may be trimmed before the German block and Telegram digest.
+  const glossary = b.glossary ?? [];
   const deepIndex = new Map([...deep.values()].flat().map((x, i) => [x, i] as const));
   const cardsById = new Map(f.cards.map((c) => [c.id, c]));
   const cards = b.german.cards.flatMap((c) => {
@@ -167,11 +171,12 @@ export const BackPage: FC<{ e: Edition }> = ({ e }) => {
 
       {/* German: word of the day, the new word from today's news (moved here from the front page,
           review 2026-11-08) and the week's words once vocabulary exists. */}
-      {(f.weekWords.length > 0 || b.word_of_day || b.german.new_word || cards.length > 0) && (
+      {(f.weekWords.length > 0 || b.word_of_day || b.german.new_word || cards.length > 0 || glossary.length > 0) && (
         <section class="lesson lesson--words" lang="de" {...fit('words')}>
           <span class="label" lang={f.lang}>
             {f.weekWords.length > 0 ? L.words : L.german}
             {f.weekWords.length > 0 && <span class="label__sub">{f.weekWords.length}</span>}
+            {glossary.length > 0 && <span class="label__sub">{L.glossarySub(glossary.length)}</span>}
           </span>
           <div class="words-strip">
             {b.word_of_day ? (
@@ -204,6 +209,13 @@ export const BackPage: FC<{ e: Edition }> = ({ e }) => {
                   </p>
                   <p class="lesson__example">{c.example}</p>
                 </div>
+              ))}
+              {/* German edition: the harder words of today's text, so the news reads almost like native. */}
+              {glossary.map((w) => (
+                <p class="words__gloss">
+                  <span class="lesson__word">{w.de}</span>
+                  <span class="lesson__gloss" lang="en">{w.en}</span>
+                </p>
               ))}
               {f.weekWords.map((w) => (
                 <p>

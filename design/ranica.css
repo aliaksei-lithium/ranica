@@ -184,6 +184,10 @@
 .flow .item, .flow .longread, .flow .digest { break-inside: auto; orphans: 2; widows: 2; }
 .flow .item__title, .flow .longread__title, .flow .digest__channel { break-after: avoid; }
 .flow .briefs__list li, .flow .item__summary { break-inside: avoid; } /* a source tag never starts a column alone */
+.flow .item--long .item__summary { break-inside: auto; }
+.item--long { margin-bottom: var(--space-2); }
+.item--long .item__title { font-size: 12.5pt; line-height: 14.5pt; }
+.item--long .longread__body { margin-top: 1.5pt; }
 .flow .lesson__grid { grid-template-columns: 1fr; }
 .flow .qr-strip { margin-top: var(--space-3); }
 .flow .qr-strip__codes { flex-wrap: wrap; row-gap: var(--space-1); }
@@ -449,7 +453,7 @@
 .table td { padding: 0.9mm 1.5mm 0.8mm 0; vertical-align: top; border-bottom: var(--rule-hair) solid var(--rule-light); font-family: var(--font-serif); font-size: var(--fs-note); line-height: var(--lh-note); }
 .table .num { font-family: var(--font-sans); font-weight: 500; font-variant-numeric: tabular-nums; white-space: nowrap; }
 .table .muted { color: var(--ink-muted); }
-.week th { width: 11.5%; }
+.week th { width: 29%; } /* the next three days (review 2026-11-09: the full week broke the phone layout) */
 .week th:first-child { width: 12mm; }
 .week__day { font-weight: 600; }
 .week__date { font-weight: 400; color: var(--ink-muted); letter-spacing: 0; }

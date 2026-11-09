@@ -36,9 +36,11 @@ export interface Brief {
   tomorrow: string;
 
   // Back page (design/pages/back-page-*.html)
-  /** Longer summaries (6–8 lines) for items whose rubric is on the front page. */
+  /** Longer articles for front-page items (since 2026-11-09 printed on the front in place of the summary). */
   deep: { rubric: string; item_id: string; title: string; body: string }[];
   /** Rubrics that only appear on the back page, e.g. World. */
   back_news: NewsPick[];
   word_of_day: { de: string; en: string; example: string; extra: string } | null;
+  /** German edition: hard words from today's German text with a short English meaning. */
+  glossary?: { de: string; en: string }[];
 }

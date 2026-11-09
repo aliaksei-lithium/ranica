@@ -87,6 +87,7 @@ const output = (): BriefOutput => {
     new_word: { de: 'der Titel', en: 'title', example: 'Der Titel ist kurz.', from_item_id: 'n1' },
     on_this_day: { text: 'Morgenstund hat Gold im Mund.', author: 'Sprichwort' },
     word_of_day: { de: '', en: '', example: '', extra: '' },
+    glossary: [],
   };
 };
 
@@ -318,7 +319,7 @@ describe('front page layout', () => {
     const { brief: b, dropped } = validateBrief(brief({ news: five, briefs, back_news: [] }), known);
     expect(b.news.map((n) => n.item_id)).toEqual(['n1', 'n2', 'n3', 'n4']);
     expect(dropped).toEqual(expect.arrayContaining(['over limit n5', 'brief n1']));
-    expect(b.briefs!.map((x) => [x.item_id, x.text.length])).toEqual([['n6', 110]]);
+    expect(b.briefs!.map((x) => [x.item_id, x.text.length])).toEqual([['n6', 150]]); // up to 180 characters now
   });
 
   it('lead row, one news flow with one-liners last; extra items and one-liners are trimmable', async () => {
@@ -407,5 +408,39 @@ describe('settings, languages and manual rebuild', () => {
     expect(de).toContain('href="/today?lang=en"');
     const en = await (await exports.default.fetch(`https://ranica.test/editions/${out.date}?lang=en`)).text();
     expect(en).toContain('<html lang="en"');
+  });
+});
+
+describe('review 2026-11-09: no repeats, three days, German word list', () => {
+  const known = { lang: 'de' as const, items: new Set(['n1', 'n2', 'n3']), events: new Set<string>(), tasks: new Set<string>(), cards: new Set<string>(), channels: new Set<string>() };
+
+  it('long articles only for front items, one each; glossary deduped, dropped for English', () => {
+    const { brief: b, dropped } = validateBrief(brief({
+      deep: [
+        { rubric: 'Germany', item_id: 'n1', title: 'L', body: 'Long.' },
+        { rubric: 'Germany', item_id: 'n1', title: 'Again', body: 'Twice.' },
+        { rubric: 'World', item_id: 'n3', title: 'Back', body: 'Not on the front.' },
+      ],
+      glossary: [{ de: 'die Nominierung', en: 'nomination' }, { de: 'Die Nominierung', en: 'again' }, { de: '', en: 'x' }],
+    }), known);
+    expect(b.deep.map((d) => d.item_id)).toEqual(['n1']);
+    expect(dropped).toEqual(expect.arrayContaining(['deep n1', 'deep n3']));
+    expect(b.glossary).toEqual([{ de: 'die Nominierung', en: 'nomination' }]);
+    expect(validateBrief(brief({ glossary: [{ de: 'x', en: 'y' }] }), { ...known, lang: 'en' }).brief.glossary).toEqual([]);
+  });
+
+  it('the long article replaces the summary on the front and is not repeated on page 2', async () => {
+    const { renderEdition } = await import('../src/compose/compose');
+    const facts = buildFacts({ reader, date: DATE, issue: 1, generatedAt: '06:00', items, weather: parseWeather(openMeteo() as never, DATE, 'en'), publicUrl: 'x/today' });
+    const html = renderEdition({ facts, brief: brief({ deep: [{ rubric: 'Germany', item_id: 'n1', title: 'Longer', body: 'The long article text.' }], glossary: [{ de: 'die Nominierung', en: 'nomination' }] }) }, 'print');
+    const front = html.slice(0, html.indexOf('sheet--page2'));
+    const back = html.slice(html.indexOf('sheet--page2'));
+    expect(front).toContain('item item--long');
+    expect(front).toContain('The long article text.');
+    expect(back).not.toContain('The long article text.');
+    expect(back).not.toContain('data-block="depth"');
+    expect(back.match(/class="week__day"/g)).toHaveLength(3); // next three days
+    expect(back).toContain('die Nominierung');
+    expect(back).toContain('harder words from today');
   });
 });

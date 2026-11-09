@@ -44,12 +44,18 @@ export function validateBrief(b: Brief, known: KnownIds): Validation {
   // Front page: at most 4 items per rubric (fit.js trims the 3rd/4th first), short summaries;
   // then one-liners. Back page: up to 5 items per rubric.
   const front = new Set<string>();
-  const news = picks(b.news, front, 80, 170, 4);
+  const news = picks(b.news, front, 80, 220, 4);
   const briefs = keep(b.briefs ?? [], (x) => known.items.has(x.item_id) && !front.has(x.item_id) && !!front.add(x.item_id), (x) => `brief ${x.item_id}`)
     .slice(0, 8)
-    .map((x) => ({ ...x, rubric: clip(rubricName(x.rubric, known.lang), 24), text: clip(x.text, 110) }));
+    .map((x) => ({ ...x, rubric: clip(rubricName(x.rubric, known.lang), 24), text: clip(x.text, 180) }));
   const back = new Set<string>(front);
   const backNews = picks(b.back_news, back, 100, 320, 5);
+  const deepUsed = new Set<string>();
+  const seenWords = new Set<string>();
+  const glossary = (known.lang === 'en' ? [] : (b.glossary ?? []))
+    .filter((g) => g.de.trim() && g.en.trim() && !seenWords.has(g.de.toLowerCase()) && !!seenWords.add(g.de.toLowerCase()))
+    .slice(0, 16)
+    .map((g) => ({ de: clip(g.de.trim(), 40), en: clip(g.en.trim(), 60) }));
   const nw = b.german.new_word;
   const hobby = b.hobby_fact;
 
@@ -71,10 +77,12 @@ export function validateBrief(b: Brief, known: KnownIds): Validation {
       },
       hobby_fact: hobby && hobby.item_id && !known.items.has(hobby.item_id) ? (dropped.push(`hobby ${hobby.item_id}`), null) : hobby,
       tomorrow: clip(b.tomorrow, 70),
-      deep: keep(b.deep, (d) => known.items.has(d.item_id), (d) => `deep ${d.item_id}`)
-        .slice(0, 4)
+      // Long articles belong to front-page items only, one per item (no repeats).
+      deep: keep(b.deep, (d) => news.some((n) => n.item_id === d.item_id) && !deepUsed.has(d.item_id) && !!deepUsed.add(d.item_id), (d) => `deep ${d.item_id}`)
+        .slice(0, 3)
         .map((d) => ({ ...d, rubric: rubricName(d.rubric, known.lang), title: clip(d.title, 90), body: clip(d.body, 700) })),
       back_news: backNews,
+      glossary,
     },
     dropped,
   };
