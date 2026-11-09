@@ -525,6 +525,10 @@
   .sheet .lead { flex-direction: column; }
   .sheet .lead > * { width: 100%; }
   .sheet .flow, .sheet .flow--2 { columns: 1; }
+  .sheet .words-strip, .sheet .words { grid-template-columns: 1fr; }
+  .sheet .wotd { border-right: 0; padding-right: 0; border-bottom: var(--rule-hair) solid var(--rule-light); padding-bottom: var(--space-2); margin-bottom: var(--space-2); }
+  .sheet .words { row-gap: 2pt; }
+  .sheet .words .lesson__word { hyphens: manual; }
 }
 /* Tablet / narrow desktop window. */
 @media screen and (min-width: 641px) and (max-width: 900px) {
@@ -542,6 +546,9 @@
 .sheet--phone .qr-strip { display: none; }
 .sheet--phone .lesson__grid { grid-template-columns: 1fr; }
 .sheet--phone .footer { flex-direction: column; gap: 2pt; }
+.sheet--phone .words-strip, .sheet--phone .words { grid-template-columns: 1fr; }
+.sheet--phone .wotd { border-right: 0; padding-right: 0; border-bottom: var(--rule-hair) solid var(--rule-light); padding-bottom: var(--space-2); margin-bottom: var(--space-2); }
+.sheet--phone .words .lesson__word { hyphens: manual; }
 
 /* ---------- Kindle: 6.8" e-reader PDF, 1236 × 1648 px, grey-scale ---------- */
 .sheet--kindle {

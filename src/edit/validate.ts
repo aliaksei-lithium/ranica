@@ -51,9 +51,10 @@ export function validateBrief(b: Brief, known: KnownIds): Validation {
   const back = new Set<string>(front);
   const backNews = picks(b.back_news, back, 100, 320, 5);
   const deepUsed = new Set<string>();
-  const seenWords = new Set<string>();
+  // Not again in the glossary: the word of the day and the new word, printed above it.
+  const seenWords = new Set([b.word_of_day?.de, b.german.new_word?.de].filter((w): w is string => !!w).map((w) => w.trim().toLowerCase()));
   const glossary = (known.lang === 'en' ? [] : (b.glossary ?? []))
-    .filter((g) => g.de.trim() && g.en.trim() && !seenWords.has(g.de.toLowerCase()) && !!seenWords.add(g.de.toLowerCase()))
+    .filter((g) => g.de.trim() && g.en.trim() && !seenWords.has(g.de.trim().toLowerCase()) && !!seenWords.add(g.de.trim().toLowerCase()))
     .slice(0, 16)
     .map((g) => ({ de: clip(g.de.trim(), 40), en: clip(g.en.trim(), 60) }));
   const nw = b.german.new_word;

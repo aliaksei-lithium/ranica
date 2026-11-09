@@ -1,5 +1,6 @@
 import { Hono } from 'hono';
 import type { Context } from 'hono';
+import { getCookie, setCookie } from 'hono/cookie';
 import type { Lang } from './model';
 import { fakeArchive, fakeEdition, type Variant } from './fake/editions';
 import { renderEdition, type Nav, type View } from './compose/compose';
@@ -11,8 +12,8 @@ import { SettingsPage } from './web/settings';
 import type { RefreshParams } from './workflows/source-refresh';
 import type { EditionParams } from './workflows/edition';
 
-// HTTP routes. /today shows the newest stored edition in ?lang= (default: the first language
-// stored); ?fake=1 (or no edition yet) shows the fake one from src/fake/ for template work.
+// HTTP routes. /today shows the newest stored edition in ?lang=, else the language last chosen
+// (cookie), else German; ?fake=1 (or no edition yet) shows the fake one from src/fake/ for template work.
 // /admin (settings, rebuild) and /admin/* need PROBE_KEY.
 
 /** The single M1 reader (seed/me.sql). */
@@ -33,8 +34,21 @@ const editionWorkflow = (c: Context<{ Bindings: Env }>): Workflow<EditionParams>
 /** The stored edition (newest, or for `date`) in ?lang=, unless ?fake=1 or there is none / no database (tests). */
 async function realEdition(c: Context<{ Bindings: Env }>, date?: string): Promise<StoredEdition | null> {
   if (c.req.query('fake') === '1' || !c.env?.DB) return null;
-  const lang = c.req.query('lang');
-  return loadEdition(c.env.DB, READER, { date, lang: lang === 'en' || lang === 'de' ? lang : undefined });
+  return loadEdition(c.env.DB, READER, { date, lang: chosenLang(c) });
+}
+
+const isLang = (v: string | undefined): v is Lang => v === 'en' || v === 'de';
+const DEFAULT_LANG: Lang = 'de';
+
+/** ?lang= (remembered in a cookie for a year), else the remembered choice, else German. */
+function chosenLang(c: Context): Lang {
+  const q = c.req.query('lang');
+  if (isLang(q)) {
+    if (getCookie(c, 'lang') !== q) setCookie(c, 'lang', q, { path: '/', maxAge: 365 * 86400, sameSite: 'Lax', secure: true, httpOnly: true });
+    return q;
+  }
+  const saved = getCookie(c, 'lang');
+  return isLang(saved) ? saved : DEFAULT_LANG;
 }
 
 const nav = (e: StoredEdition, path: string): Nav => ({ langs: e.langs, path });

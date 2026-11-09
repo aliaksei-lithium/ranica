@@ -401,7 +401,13 @@ describe('settings, languages and manual rebuild', () => {
     expect(out.refreshed).toBe(SOURCES.length - 1); // one item per RSS feed, none from Telegram
     expect(out.editions.map((e) => e.lang)).toEqual(['en', 'de']);
 
-    expect(await (await exports.default.fetch('https://ranica.test/today')).text()).toContain('<html lang="en"'); // reader locale
+    expect(await (await exports.default.fetch('https://ranica.test/today')).text()).toContain('<html lang="de"'); // default
+    // The choice is remembered: ?lang=en sets a cookie, and /today without ?lang then stays English.
+    const choose = await exports.default.fetch('https://ranica.test/today?lang=en');
+    const cookie = choose.headers.get('set-cookie') ?? '';
+    expect(cookie).toContain('lang=en');
+    const again = await exports.default.fetch('https://ranica.test/today', { headers: { cookie: cookie.split(';')[0] ?? '' } });
+    expect(await again.text()).toContain('<html lang="en"');
     const de = await (await exports.default.fetch('https://ranica.test/today?lang=de')).text();
     expect(de).toContain('<html lang="de"');
     expect(de).toContain('<strong>Deutsch</strong>');
@@ -421,7 +427,7 @@ describe('review 2026-11-09: no repeats, three days, German word list', () => {
         { rubric: 'Germany', item_id: 'n1', title: 'Again', body: 'Twice.' },
         { rubric: 'World', item_id: 'n3', title: 'Back', body: 'Not on the front.' },
       ],
-      glossary: [{ de: 'die Nominierung', en: 'nomination' }, { de: 'Die Nominierung', en: 'again' }, { de: '', en: 'x' }],
+      glossary: [{ de: 'die Nominierung', en: 'nomination' }, { de: 'Die Nominierung', en: 'again' }, { de: '', en: 'x' }, { de: 'der Titel ', en: 'the new word again' }],
     }), known);
     expect(b.deep.map((d) => d.item_id)).toEqual(['n1']);
     expect(dropped).toEqual(expect.arrayContaining(['deep n1', 'deep n3']));
