@@ -84,11 +84,11 @@
 .masthead__edition { text-align: right; }
 .masthead__wordmark {
   display: block;
-  font-family: var(--font-display);
-  font-weight: 900;
+  font-family: var(--font-fraktur); /* German blackletter nameplate */
+  font-weight: 400;
   font-size: var(--fs-wordmark);
   line-height: 0.82;
-  letter-spacing: -0.01em;
+  letter-spacing: 0;
 }
 .masthead__title {
   display: block;
@@ -602,7 +602,7 @@
 .widget__date { display: flex; align-items: baseline; gap: 12px; }
 .widget__month { font-family: var(--font-display); font-weight: 700; font-size: 28px; line-height: 1; display: block; }
 .widget__weekday { font-family: var(--font-sans); font-weight: 500; font-size: 13px; letter-spacing: 0.1em; text-transform: uppercase; display: block; margin-top: 4px; }
-.widget__wordmark { font-family: var(--font-display); font-weight: 700; font-size: 24px; line-height: 1; text-align: right; }
+.widget__wordmark { font-family: var(--font-fraktur); font-weight: 400; font-size: 28px; line-height: 1; text-align: right; }
 .widget__wordmark small { display: block; font-family: var(--font-sans); font-weight: 600; font-size: 11px; letter-spacing: 0.12em; text-transform: uppercase; margin-top: 5px; }
 .widget__sun { grid-column: 1 / -1; font-family: var(--font-sans); font-weight: 500; font-size: 14px; line-height: 1.3; padding: 5px 0; border-bottom: 1.5px solid #000; display: flex; flex-wrap: wrap; }
 .widget__sun .sunline__item + .sunline__item::before { color: #000; }

@@ -73,7 +73,7 @@ const common = {
   issue: 12,
   city: 'Berlin',
   readerName: 'Aliaksei',
-  editionTitle: 'Утренний Алексей',
+  editionTitle: 'Ранішні Аляксей',
   sun: { sunrise: '07:06', sunset: '16:33', dayMinutes: 9 * 60 + 27, deltaMinutes: -3 },
   items,
   cards,

@@ -17,7 +17,7 @@ export interface Facts {
   issue: number;
   city: string;
   readerName: string;
-  /** The reader's own title under the masthead, e.g. "Утренний Алексей". */
+  /** The reader's own title under the masthead, e.g. "Ранішні Аляксей". */
   editionTitle: string;
   sun: { sunrise: string; sunset: string; dayMinutes: number; deltaMinutes: number } | null;
   countdowns: { label: string; days: number }[];

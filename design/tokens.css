@@ -6,6 +6,7 @@
   --ink-muted: #595959;
   --rule: #000000;
   --rule-light: #8c8c8c;
+  --font-fraktur: "UnifrakturMaguntia", "Playfair Display", Georgia, serif;
   --font-display: "Playfair Display", "Old Standard TT", Georgia, serif;
   --font-serif: "PT Serif", "Source Serif 4", Georgia, serif;
   --font-sans: "IBM Plex Sans", "Inter", system-ui, sans-serif;

@@ -8,6 +8,7 @@ const FONTS = [
   { pkg: 'playfair-display', files: ['700.css', '900.css'] },
   { pkg: 'pt-serif', files: ['400.css', '400-italic.css', '700.css', '700-italic.css'] },
   { pkg: 'ibm-plex-sans', files: ['400.css', '500.css', '600.css'] },
+  { pkg: 'unifrakturmaguntia', files: ['400.css'] }, // the Fraktur nameplate; latin only
 ];
 const SUBSETS = ['latin', 'latin-ext', 'cyrillic', 'cyrillic-ext'];
 const OUT = 'public/fonts';
