@@ -12,7 +12,7 @@
 /* ---------- The sheet: the A4 page ---------- */
 .sheet {
   /* type scale (print) — see tokens.json › type */
-  --fs-date: 66pt;      --lh-date: 0.82;
+  --fs-date: 50pt;      --lh-date: 0.82; /* the day sits on the nameplate baseline, no taller than it */
   --fs-month: 22pt;     --lh-month: 1;
   --fs-wordmark: 50pt;  /* the nameplate: as big as a newspaper title (was 18pt) */
   --fs-weather: 42pt;
@@ -49,14 +49,30 @@
 .sheet a { color: inherit; text-decoration: none; }
 
 /* ---------- Masthead (A) ---------- */
+/* One grid, two shared baselines, as on an old front page where the ears line up with the
+   nameplate: "9 November" sits on the baseline of "Ranica", the weekday on the baseline of the
+   reader's title. The wrappers (.masthead__date, .masthead__edition) dissolve into the grid. */
 .masthead {
-  display: flex;
-  justify-content: space-between;
-  align-items: flex-end;
+  display: grid;
+  grid-template-columns: auto auto 1fr auto;
+  grid-template-areas:
+    "day month   . word"
+    ".   weekday . title"
+    ".   .       . motto"
+    ".   .       . imprint";
+  align-items: baseline;
   padding-bottom: var(--space-2);
   border-bottom: var(--rule-heavy) solid var(--rule);
 }
-.masthead__date { display: flex; align-items: baseline; gap: var(--space-2); }
+.masthead__date, .masthead__date > span:not(.masthead__day), .masthead__edition { display: contents; }
+.masthead__day { grid-area: day; margin-right: var(--space-2); }
+.masthead__month { grid-area: month; }
+.masthead__weekday { grid-area: weekday; }
+.masthead__wordmark { grid-area: word; }
+.masthead__title { grid-area: title; }
+.masthead__motto { grid-area: motto; }
+.masthead__imprint { grid-area: imprint; }
+.masthead__wordmark, .masthead__title, .masthead__motto, .masthead__imprint { justify-self: end; text-align: right; }
 .masthead__day {
   font-family: var(--font-display);
   font-weight: 900;
@@ -81,7 +97,6 @@
   text-transform: uppercase;
   margin-top: var(--space-1);
 }
-.masthead__edition { text-align: right; }
 .masthead__wordmark {
   display: block;
   font-family: var(--font-fraktur); /* German blackletter nameplate */
@@ -516,10 +531,11 @@
   .sheet .columns { grid-template-columns: 1fr; }
   .sheet .col--left { padding-right: 0; }
   .sheet .col--right { padding-left: 0; border-left: 0; margin-top: var(--space-3); border-top: var(--rule-thin) solid var(--rule); }
-  .masthead { flex-direction: column; align-items: flex-start; gap: var(--space-2); }
-  .masthead__edition { text-align: left; }
+  .masthead { grid-template-columns: auto 1fr; grid-template-areas: "day month" ". weekday" "word word" "title title" "imprint imprint"; }
+  .masthead__wordmark { margin-top: var(--space-3); }
+  .masthead__wordmark, .masthead__title, .masthead__imprint { justify-self: start; text-align: left; }
   .masthead__motto { display: none; }
-  .sheet { --fs-date: 56pt; }
+  .sheet { --fs-date: 44pt; }
   .sheet .lesson__grid { grid-template-columns: 1fr; }
   .sheet .footer { flex-direction: column; gap: 2pt; }
   .sheet .lead { flex-direction: column; }
@@ -534,14 +550,15 @@
 @media screen and (min-width: 641px) and (max-width: 900px) {
   .desk .sheet { zoom: 1; }
 }
-.sheet--phone { width: 100%; min-height: 0; padding: 6mm; --fs-date: 56pt; }
+.sheet--phone { width: 100%; min-height: 0; padding: 6mm; --fs-date: 44pt; }
 .sheet--phone .columns { grid-template-columns: 1fr; }
 .sheet--phone .lead { flex-direction: column; }
 .sheet--phone .flow { columns: 1; }
 .sheet--phone .col--left { padding-right: 0; }
 .sheet--phone .col--right { padding-left: 0; border-left: 0; margin-top: var(--space-3); border-top: var(--rule-thin) solid var(--rule); }
-.sheet--phone .masthead { flex-direction: column; align-items: flex-start; gap: var(--space-2); }
-.sheet--phone .masthead__edition { text-align: left; }
+.sheet--phone .masthead { grid-template-columns: auto 1fr; grid-template-areas: "day month" ". weekday" "word word" "title title" "imprint imprint"; }
+.sheet--phone .masthead__wordmark { margin-top: var(--space-3); }
+.sheet--phone .masthead__wordmark, .sheet--phone .masthead__title, .sheet--phone .masthead__imprint { justify-self: start; text-align: left; }
 .sheet--phone .masthead__motto { display: none; }
 .sheet--phone .qr-strip { display: none; }
 .sheet--phone .lesson__grid { grid-template-columns: 1fr; }
@@ -553,7 +570,7 @@
 /* ---------- Kindle: 6.8" e-reader PDF, 1236 × 1648 px, grey-scale ---------- */
 .sheet--kindle {
   --page-w: 1236px; --page-h: 1648px; --margin: 48px; --gutter: 0px;
-  --fs-date: 108pt; --fs-month: 36pt; --fs-wordmark: 80pt; --fs-weather: 64pt;
+  --fs-date: 80pt; --fs-month: 36pt; --fs-wordmark: 80pt; --fs-weather: 64pt;
   --fs-headline: 16.5pt; --lh-headline: 20pt;
   --fs-body: 14pt; --lh-body: 18.5pt;
   --fs-insight: 15pt; --lh-insight: 20pt;

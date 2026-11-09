@@ -4,7 +4,7 @@
 // - Static files (CSS, fonts, scripts, icons): served from cache, refreshed in the background.
 // - Never cached: /admin, /api, /probe and anything that is not a GET.
 // Bump VERSION when the list of precached files changes; old caches are removed on activate.
-const VERSION = 'v3';
+const VERSION = 'v4';
 const PAGES = `ranica-pages-${VERSION}`;
 const STATIC = `ranica-static-${VERSION}`;
 const PRECACHE = [

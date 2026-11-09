@@ -55,7 +55,7 @@ Priorities: P1 never removed, P5 removed first.
 
 | # | Block | Priority | Content budget (per language) |
 |---|---|---|---|
-| A | **Masthead**: day number very large, month name, weekday + year; edition name ("Ranica" + reader's own title, e.g. "Ранішні Аляксей"), issue number, "Print run: 1 copy · <city> · for <name>" | P1 | Date number ≥ 60 pt. Two short lines of small caps/labels. |
+| A | **Masthead**: day number very large, month name, weekday + year; edition name ("Ranica" + reader's own title, e.g. "Ранішні Аляксей"), issue number, "Print run: 1 copy · <city> · for <name>" | P1 | Date number about the nameplate size (50 pt), on the nameplate baseline. Two short lines of small caps/labels. |
 | B | **Sun line**: sunrise, sunset, day length, change vs yesterday, 1–3 countdowns ("47 days to Christmas", "12 days to B1 exam") | P1 | One line, 70–110 characters. |
 | C | **Weather**: big temperature (today's max), 2–3 lines of plain text (morning / feels-like / afternoon / wind), one highlighted advice line ("Colder than it looks. Hat.") | P1 | Number ≥ 36 pt; ≤ 220 characters text. |
 | D | **Today**: time-ordered events (time, title, duration/place, optional grey note like "leave by 12:20, U8 takes 18 min") then tasks with checkboxes and a grey context line each | P1 | Up to 6 events + 6 tasks; each ≤ 2 lines. Empty state: "No meetings today." |
