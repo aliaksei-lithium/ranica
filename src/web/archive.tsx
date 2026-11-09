@@ -7,7 +7,10 @@ export const ArchivePage: FC<{ lang: Lang; list: { date: string; issue: number }
   const L = t(lang);
   return (
     <Doc lang={lang} title={`Ranica · ${L.archive}`} bodyClass="view-web">
-      <div class="desk">
+      <div class="desk desk--stack">
+        <nav class="toolbar">
+          <a href="/today">{lang === 'de' ? 'Heute' : 'Today'}</a>
+        </nav>
         <article class="sheet sheet--archive" lang={lang}>
           <header class="masthead masthead--page2">
             <div class="masthead__date">

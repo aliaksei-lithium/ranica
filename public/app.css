@@ -56,3 +56,9 @@ body { background: var(--desk); }
 .admin .table { font-size: 12px; }
 .admin .table td { font-family: var(--font-sans); font-size: 12px; }
 @media (max-width: 640px) { .admin .table { display: block; overflow-x: auto; } }
+
+/* Installed as an app (standalone): keep content clear of the iPhone notch / status bar. */
+@media (display-mode: standalone) {
+  .desk { padding-top: max(24px, env(safe-area-inset-top)); }
+  .admin { padding-top: max(24px, env(safe-area-inset-top)); }
+}

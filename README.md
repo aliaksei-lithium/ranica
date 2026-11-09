@@ -62,6 +62,16 @@ copied to `public/css/` by the wrangler build step · `src/fake/` sample data fr
 `public/fit.js` priority-based trimming · `public/app.css` view glue · `scripts/render.mjs` local Playwright render ·
 `scripts/copy-fonts.mjs` self-hosts the OFL fonts (Playfair Display, PT Serif, IBM Plex Sans) in `public/fonts`.
 
+## App (PWA)
+
+Ranica installs as an app: on iPhone open the page in Safari → Share → **Add to Home Screen**; in
+Chrome/Edge use the install icon in the address bar. `public/manifest.webmanifest` (start page
+`/today`, shortcuts Deutsch and Archive), icons in `public/icons/` (the nameplate "R" in Playfair
+Display Black), and `public/sw.js`: pages load from the network first (4 s timeout) and fall back
+to the last cached copy, so the editions you opened stay readable offline; CSS, fonts and scripts
+come from the cache and refresh in the background; `/admin`, `/api` and `/probe` are never cached.
+Bump `VERSION` in `sw.js` when the precached file list changes.
+
 ## Deploy
 
 GitHub Actions (`.github/workflows/`):

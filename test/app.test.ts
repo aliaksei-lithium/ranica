@@ -48,6 +48,13 @@ describe('M0 routes with fake data', () => {
     for (const block of ['sport', 'hobby', 'onthisday', 'telegram']) expect(body).not.toContain(`data-block="${block}"`);
   });
 
+  it('is installable: manifest, icons and the service worker script are linked', async () => {
+    const { body } = await get('/today');
+    expect(body).toContain('<link rel="manifest" href="/manifest.webmanifest"/>');
+    expect(body).toContain('rel="apple-touch-icon" href="/icons/apple-touch-icon.png"');
+    expect(body).toContain('<script src="/pwa.js" defer=""></script>');
+  });
+
   it('pages=1 drops the back page', async () => {
     const { body } = await get('/today?pages=1');
     expect(body).not.toContain('sheet--page2');

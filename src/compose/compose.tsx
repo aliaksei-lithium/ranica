@@ -23,6 +23,16 @@ export const Doc: FC<{ lang: string; title: string; bodyClass: string; fit?: boo
       <link rel="stylesheet" href="/css/tokens.css" />
       <link rel="stylesheet" href="/css/ranica.css" />
       <link rel="stylesheet" href="/app.css" />
+      {/* PWA: installable from the browser menu ("Add to Home Screen" on iPhone), offline via /sw.js. */}
+      <link rel="manifest" href="/manifest.webmanifest" />
+      <meta name="theme-color" content="#ffffff" />
+      <link rel="icon" type="image/png" sizes="32x32" href="/icons/favicon-32.png" />
+      <link rel="apple-touch-icon" href="/icons/apple-touch-icon.png" />
+      <meta name="apple-mobile-web-app-title" content="Ranica" />
+      <meta name="mobile-web-app-capable" content="yes" />
+      <meta name="apple-mobile-web-app-capable" content="yes" />
+      <meta name="apple-mobile-web-app-status-bar-style" content="default" />
+      <script src="/pwa.js" defer />
       {p.fit && <script src="/fit.js" defer />}
     </head>
     <body class={p.bodyClass} data-fit={p.fit ? 'sheet' : undefined}>
