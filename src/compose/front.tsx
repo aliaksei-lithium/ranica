@@ -9,6 +9,13 @@ import { fit } from './priorities';
 import { signed, slug, t } from './i18n';
 import { Footer, Masthead, SunItems, Unavailable, quote } from './parts';
 import { qrSvg } from './qr';
+import { type Holiday, holidaysAround } from './holidays';
+
+/** "24.12." / "24 Dec" */
+const dayMonth = (iso: string, lang: 'en' | 'de') => {
+  const [, m, d] = iso.split('-').map(Number) as [number, number, number];
+  return lang === 'de' ? `${d}.${m}.` : `${d} ${new Intl.DateTimeFormat('en-GB', { month: 'short', timeZone: 'UTC' }).format(new Date(Date.UTC(2000, m - 1, d)))}`;
+};
 
 /** Russian / Belarusian text keeps its own lang attribute (hyphenation, screen readers). */
 export const cyrillic = (s: string) => /[\u0400-\u04FF]/.test(s);
@@ -66,8 +73,9 @@ export const NewsRubric: FC<{ r: Rubric; more?: string; block?: 'news' | 'world'
 export const FrontPage: FC<{ e: Edition; kindle?: boolean }> = ({ e, kindle }) => {
   const { facts: f, brief: b } = e;
   const L = t(f.lang);
-  const notes = new Map(b.agenda.map((a) => [a.event_id, a.note]));
-  const contexts = new Map(b.tasks.map((x) => [x.task_id, x.context]));
+  // "Today" shows the public holidays in Berlin and Belarus, not the reader's own plans.
+  const hol = holidaysAround(f.date, f.lang);
+  const where = (h: Holiday) => [...h.regions.map((r) => L.regions[r]), ...(h.off ? [L.dayOff] : [])].join(' · ');
   const news = rubrics(e, b.news, 5);
   const itemsById = new Map(f.items.map((i) => [i.id, i]));
   const briefs = (b.briefs ?? []).flatMap((x) => {
@@ -101,42 +109,27 @@ export const FrontPage: FC<{ e: Edition; kindle?: boolean }> = ({ e, kindle }) =
         </section>
 
         <section class="section section--today" {...fit('today')}>
-          <span class="label">{L.today}</span>
-          <div class="agenda">
-            {f.events.length === 0 && <p class="agenda__empty">{L.noEvents}</p>}
-            {f.events.slice(0, 6).map((ev) => {
-              const note = notes.get(ev.id);
-              return (
-                <>
-                  <span class="agenda__time">{ev.time}</span>
-                  <p>
-                    <span class="agenda__title">{ev.title}</span>
-                    {ev.durationMin && <span class="agenda__meta">{ev.durationMin} {L.min}</span>}
-                    {ev.place && <span class="agenda__meta">{ev.place}</span>}
-                  </p>
-                  {note && <p class="agenda__note">{note}</p>}
-                </>
-              );
-            })}
-            {f.tasks.length > 0 && (
-              <div class="agenda__tasks-label">
-                <span class="label">{L.tasks}</span>
-              </div>
-            )}
-            {f.tasks.slice(0, 6).map((task) => {
-              const ctx = contexts.get(task.id);
-              return (
-                <>
-                  <span class="agenda__time agenda__time--check">
-                    <span class={task.done ? 'checkbox checkbox--done' : 'checkbox'} role="checkbox" aria-checked={task.done ? 'true' : 'false'} />
-                  </span>
-                  <p>
-                    <span class="agenda__title">{task.title}</span>
-                  </p>
-                  {ctx && <p class="agenda__note">{ctx}</p>}
-                </>
-              );
-            })}
+          <span class="label">{L.holidays}</span>
+          <div class="agenda agenda--dates">
+            {hol.today.length === 0 && <p class="agenda__empty">{L.noHoliday}</p>}
+            {hol.today.map((h) => (
+              <>
+                <span class="agenda__time">{L.todayShort}</span>
+                <p>
+                  <span class="agenda__title">{h.name}</span>
+                  <span class="agenda__meta">{where(h)}</span>
+                </p>
+              </>
+            ))}
+            {hol.next.map((h) => (
+              <>
+                <span class="agenda__time">{dayMonth(h.date, f.lang)}</span>
+                <p>
+                  <span class={h.off ? 'agenda__title' : 'agenda__title agenda__title--minor'}>{h.name}</span>
+                  <span class="agenda__meta">{where(h)} · {L.inDays(h.inDays)}</span>
+                </p>
+              </>
+            ))}
           </div>
           {b.sport && (
             <p class="runin" {...fit('sport')}>

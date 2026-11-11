@@ -275,8 +275,8 @@ describe('EditionWorkflow', () => {
     const page = await (await exports.default.fetch('https://ranica.test/today')).text();
     expect(page).toContain('BVG');
     expect(page).toContain('Issue №1');
-    expect(page).not.toContain('leave by 12:20'); // not the fake edition
-    expect(await (await exports.default.fetch('https://ranica.test/today?fake=1')).text()).toContain('leave by 12:20');
+    expect(page).not.toContain('Sign today, fly cheaper'); // not the fake edition
+    expect(await (await exports.default.fetch('https://ranica.test/today?fake=1')).text()).toContain('Sign today, fly cheaper');
     expect((await (await exports.default.fetch(`https://ranica.test/editions/${DATE}`)).text())).toContain('BVG');
   });
 
@@ -308,7 +308,7 @@ describe('EditionWorkflow', () => {
 });
 
 it('the fake edition still renders without a database', async () => {
-  expect(await (await app.request('/today')).text()).toContain('leave by 12:20');
+  expect(await (await app.request('/today')).text()).toContain('Sign today, fly cheaper');
 });
 
 describe('front page layout', () => {

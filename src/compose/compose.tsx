@@ -41,7 +41,7 @@ export const Doc: FC<{ lang: string; title: string; bodyClass: string; fit?: boo
   </html>
 );
 
-/** Links above the sheets on screen: languages stored for this day, web/print view, archive. */
+/** Links on screen (below the sheets in the web view, above them in the print view): languages stored for this day, web/print view, archive. */
 export interface Nav {
   langs: Lang[];
   /** Path of this page without query, e.g. /today or /editions/2026-11-08. */
@@ -80,9 +80,10 @@ export function renderEdition(e: Edition, view: View, opts: { backPage?: boolean
       </>
     ) : (
       <div class="desk desk--stack">
-        {opts.nav && <Toolbar nav={opts.nav} lang={e.facts.lang} view={view} />}
         <FrontPage e={e} />
         {back && <BackPage e={e} />}
+        {/* Below the sheets, so a phone opens on the white page, not on the grey link bar. */}
+        {opts.nav && <Toolbar nav={opts.nav} lang={e.facts.lang} view={view} />}
       </div>
     );
   const page = (
