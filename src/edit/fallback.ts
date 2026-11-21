@@ -12,7 +12,7 @@ const RUBRICS = {
 type Key = keyof (typeof RUBRICS)['en'];
 
 const newest = (a: EditorItem, b: EditorItem) => (b.published ?? '').localeCompare(a.published ?? '');
-/** Sources without a fixed rubric (Berliner Zeitung) count as Berlin. */
+/** Sources without a fixed rubric (none at the moment; Berliner Zeitung had none) count as Berlin. */
 const rubricOf = (i: EditorItem): Key => ((i.rubric ?? 'Berlin') in RUBRICS.en ? (i.rubric ?? 'Berlin') : 'Berlin') as Key;
 
 export function fallbackBrief(input: EditorInput): Brief {
@@ -49,6 +49,8 @@ export function fallbackBrief(input: EditorInput): Brief {
       points: [...c.items].sort(newest).slice(0, 5).map((i) => clip(i.title, 140)),
     })),
     insight: '',
+    // Stadtgespräch needs an editor: search terms alone do not say what happened.
+    talk: null,
     sport: null,
     german: { cards: [], new_word: null },
     hobby_fact: null,

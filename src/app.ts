@@ -1,6 +1,6 @@
 import { Hono } from 'hono';
 import type { Context } from 'hono';
-import { getCookie, setCookie } from 'hono/cookie';
+import { deleteCookie, getCookie, setCookie } from 'hono/cookie';
 import type { Lang } from './model';
 import { fakeArchive, fakeEdition, type Variant } from './fake/editions';
 import { renderEdition, type Nav, type View } from './compose/compose';
@@ -8,23 +8,30 @@ import { ArchivePage } from './web/archive';
 import { probeSources } from './web/probe';
 import type { Env } from './env';
 import { editionLog, getReader, listEditions, loadEdition, saveSettings, sourceStatus, type StoredEdition } from './db/queries';
-import { SettingsPage } from './web/settings';
+import { LoginPage, SettingsPage } from './web/settings';
 import type { RefreshParams } from './workflows/source-refresh';
 import type { EditionParams } from './workflows/edition';
 
 // HTTP routes. /today shows the newest stored edition in ?lang=, else the language last chosen
 // (cookie), else German; ?fake=1 (or no edition yet) shows the fake one from src/fake/ for template work.
-// /admin (settings, rebuild) and /admin/* need PROBE_KEY.
+// /admin (settings, rebuild) and /admin/* need PROBE_KEY: as ?key=, or typed once into the /admin login form.
 
 /** The single M1 reader (seed/me.sql). */
 const READER = 1;
 
 export const app = new Hono<{ Bindings: Env }>();
 
-/** Routes for the operator only: 404 unless the PROBE_KEY secret is set and passed as ?key=…. */
+/** Routes for the operator only: 404 unless the PROBE_KEY secret is set and passed as ?key=… or remembered from the /admin login. */
+const ADMIN_COOKIE = 'admin_key';
 const authorized = (c: Context<{ Bindings: Env }>) => {
   const key = c.env?.PROBE_KEY;
-  return !!key && c.req.query('key') === key;
+  return !!key && (c.req.query('key') || getCookie(c, ADMIN_COOKIE)) === key;
+};
+
+/** /admin with the ?key= the request came with (none when the login cookie is used), plus `extra`. */
+const adminUrl = (c: Context, extra = '') => {
+  const q = [c.req.query('key') ? `key=${encodeURIComponent(c.req.query('key')!)}` : '', extra].filter(Boolean).join('&');
+  return q ? `/admin?${q}` : '/admin';
 };
 
 /** ctx.exports.SourceRefreshWorkflow (declared under `exports` in wrangler.jsonc). */
@@ -128,7 +135,10 @@ app.post('/admin/edition', async (c) => {
 
 /** Settings page: schedule on/off, languages, wake time, rebuild button, recent editions, sources. */
 app.get('/admin', async (c) => {
-  if (!authorized(c)) return c.notFound();
+  if (!authorized(c)) {
+    if (!c.env?.PROBE_KEY) return c.notFound();
+    return c.html(`<!doctype html>${LoginPage({ wrong: c.req.query('wrong') === '1' })}`, c.req.query('wrong') === '1' ? 401 : 200);
+  }
   const reader = await getReader(c.env.DB, READER);
   if (!reader) return c.text('No reader: run seed/me.sql', 500);
   const runId = c.req.query('run');
@@ -142,7 +152,22 @@ app.get('/admin', async (c) => {
     }
   }
   const [log, sources] = await Promise.all([editionLog(c.env.DB, READER), sourceStatus(c.env.DB)]);
-  return c.html(`<!doctype html>${SettingsPage({ reader, keyParam: c.req.query('key')!, log, sources, run })}`);
+  return c.html(`<!doctype html>${SettingsPage({ reader, keyParam: c.req.query('key') ?? '', log, sources, run })}`);
+});
+
+/** The /admin login form: remembers the key in an HttpOnly cookie for /admin, so it stays out of URLs. */
+app.post('/admin/login', async (c) => {
+  const key = c.env?.PROBE_KEY;
+  if (!key) return c.notFound();
+  const body = await c.req.parseBody();
+  if (body.key !== key) return c.redirect('/admin?wrong=1', 303);
+  setCookie(c, ADMIN_COOKIE, key, { path: '/admin', maxAge: 90 * 86400, sameSite: 'Strict', secure: true, httpOnly: true });
+  return c.redirect('/admin', 303);
+});
+
+app.post('/admin/logout', (c) => {
+  deleteCookie(c, ADMIN_COOKIE, { path: '/admin', secure: true });
+  return c.redirect('/today', 303);
 });
 
 app.post('/admin/settings', async (c) => {
@@ -151,14 +176,14 @@ app.post('/admin/settings', async (c) => {
   const langs = ([] as unknown[]).concat(body.lang ?? []).filter((l): l is Lang => l === 'en' || l === 'de');
   const wake = typeof body.wakeTime === 'string' && /^\d{2}:\d{2}$/.test(body.wakeTime) ? body.wakeTime : '07:00';
   await saveSettings(c.env.DB, READER, { autoRefresh: body.autoRefresh === 'on', autoEdition: body.autoEdition === 'on', editionLangs: langs, wakeTime: wake });
-  return c.redirect(`/admin?key=${encodeURIComponent(c.req.query('key')!)}`, 303);
+  return c.redirect(adminUrl(c), 303);
 });
 
 /** The "Rebuild now" button: fetch all sources, then build today's edition in every chosen language. */
 app.post('/admin/rebuild', async (c) => {
   if (!authorized(c)) return c.notFound();
   const instance = await editionWorkflow(c).create({ params: { userId: READER, refresh: true } });
-  return c.redirect(`/admin?key=${encodeURIComponent(c.req.query('key')!)}&run=${encodeURIComponent(instance.id)}`, 303);
+  return c.redirect(adminUrl(c, `run=${encodeURIComponent(instance.id)}`), 303);
 });
 
 app.get('/admin/edition/:id', async (c) => {

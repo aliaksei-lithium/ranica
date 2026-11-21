@@ -9,6 +9,9 @@ import tagesschauXml from './fixtures/rss-tagesschau.xml?raw';
 import fazXml from './fixtures/rss-faz.xml?raw';
 import bzXml from './fixtures/rss-berliner-zeitung.xml?raw';
 import telegramHtml from './fixtures/telegram-zerkalo.html?raw';
+import trendsXml from './fixtures/rss-trends-berlin.xml?raw';
+import { parseTrends } from '../src/collect/rss';
+import { parseSource } from '../src/collect/fetch';
 
 const FIXTURES: Record<string, string> = {
   'rss-tagesschau.xml': tagesschauXml,
@@ -33,6 +36,32 @@ describe('text helpers', () => {
     expect(hash('abc')).toBe(hash('abc'));
     expect(hash('abc')).not.toBe(hash('abd'));
     expect(hash('abc')).toMatch(/^[0-9a-f]{8}$/);
+  });
+});
+
+describe('Google Trends parser', () => {
+  it('one item per search term and day: traffic and article titles in the body, first article as link', () => {
+    const items = parseTrends(trendsXml, 'trends-berlin');
+    expect(items.map((i) => i.title)).toEqual(['mönchengladbach – dortmund', 'simson', 'manuela schwesig']);
+    expect(items[0]).toMatchObject({
+      sourceId: 'trends-berlin',
+      externalId: 'mönchengladbach – dortmund|2026-11-21',
+      url: 'https://www.borussia.de/news/alles-wissenswerte-zum-heimspiel-gegen-dortmund',
+      publishedAt: '2026-11-21T13:50:00.000Z',
+    });
+    expect(items[0]!.body.split('\n')).toEqual([
+      '200+ searches.',
+      'Alles Wissenswerte zum Heimspiel gegen Dortmund (Borussia Mönchengladbach)',
+      'Bundesliga heute: Gladbach – BVB hier im Live-Ticker! (Sport Bild)',
+      'Läuft Borussia Mönchengladbach - Borussia Dortmund (BVB) heute im Free-TV? (DAZN)',
+    ]);
+    expect(items[2]!.body).toContain('"Nur die Galle": Manuela Schwesig muss sich operieren lassen (NDR.de)');
+  });
+
+  it('the trends sources use it, Berlin and Germany', () => {
+    const trends = SOURCES.filter((s) => s.kind === 'rss' && s.format === 'trends');
+    expect(trends.map((s) => s.id)).toEqual(['trends-berlin', 'trends-de']);
+    expect(parseSource(trends[0]!, trendsXml)).toHaveLength(3);
   });
 });
 
@@ -126,8 +155,8 @@ describe('/probe/sources', () => {
     const rss = fixture('rss-tagesschau.xml');
     const tg = fixture('telegram-zerkalo.html');
     vi.stubGlobal('fetch', async (url: string) => {
-      if (url.includes('faz.net')) throw new Error('connect timeout');
-      if (url.includes('berliner-zeitung')) return new Response('blocked', { status: 403 });
+      if (url.includes('handelsblatt.com')) throw new Error('connect timeout');
+      if (url.includes('morgenpost.de')) return new Response('blocked', { status: 403 });
       return new Response(url.startsWith('https://t.me/') ? tg : rss);
     });
     const res = await app.request('/probe/sources?key=k', {}, { PROBE_KEY: 'k' });
@@ -137,8 +166,8 @@ describe('/probe/sources', () => {
     const by = new Map(body.results.map((r) => [r.id, r]));
     expect(by.get('tagesschau-inland')).toMatchObject({ ok: true, status: 200, items: 2, sample: 'Bundestag beschließt neues Gesetz' });
     expect(by.get('tg-zerkalo')).toMatchObject({ ok: true, items: 2 });
-    expect(by.get('faz-inland')).toMatchObject({ ok: false, status: null, error: 'connect timeout' });
-    expect(by.get('berliner-zeitung')).toMatchObject({ ok: false, status: 403 });
-    expect(body.ok).toBe(SOURCES.length - 3); // faz-inland, faz-ausland, berliner-zeitung fail
+    expect(by.get('handelsblatt-top')).toMatchObject({ ok: false, status: null, error: 'connect timeout' });
+    expect(by.get('morgenpost-berlin')).toMatchObject({ ok: false, status: 403 });
+    expect(body.ok).toBe(SOURCES.length - 3); // both Handelsblatt feeds and the Morgenpost fail
   });
 });

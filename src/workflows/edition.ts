@@ -5,7 +5,7 @@ import { WorkflowEntrypoint, type WorkflowEvent, type WorkflowStep } from 'cloud
 import type { Env } from '../env';
 import type { Lang } from '../model';
 import { fetchForecast, parseWeather, type WeatherFacts } from '../collect/weather';
-import { getReader, itemsForUser, nextIssue, saveEdition } from '../db/queries';
+import { getReader, itemsForUser, nextIssue, recentlyPrinted, saveEdition } from '../db/queries';
 import { buildEditorInput, buildFacts, localNow } from '../edition/facts';
 import { runEditor, EditorRefusal, type EditorResult } from '../edit/editor';
 import { fallbackBrief } from '../edit/fallback';
@@ -51,8 +51,12 @@ export class EditionWorkflow extends WorkflowEntrypoint<Env, EditionParams> {
       const now = localNow(new Date(), reader.timezone);
       const date = event.payload.date ?? now.date;
       const since = new Date(Date.now() - WINDOW_HOURS * 3_600_000).toISOString();
-      const items = await itemsForUser(db, userId, since, PER_SOURCE);
-      return { reader, date, generatedAt: now.time, issue: await nextIssue(db, userId, date), items };
+      // Items already printed in the last days are not offered again; their headlines go to the
+      // editor so it does not pick the same story from another source either.
+      const printed = await recentlyPrinted(db, userId, date, reader.locale);
+      const seen = new Set(printed.ids);
+      const items = (await itemsForUser(db, userId, since, PER_SOURCE)).filter((i) => !seen.has(`n${i.id}`));
+      return { reader, date, generatedAt: now.time, issue: await nextIssue(db, userId, date), items, printedRecently: printed.titles };
     });
     const langs = event.payload.langs?.length ? event.payload.langs : ctx.reader.editionLangs.length ? ctx.reader.editionLangs : [ctx.reader.locale];
 
@@ -77,7 +81,7 @@ export class EditionWorkflow extends WorkflowEntrypoint<Env, EditionParams> {
         }
       }
       const reader = { ...ctx.reader, locale: lang };
-      const input = buildEditorInput(reader, ctx.date, ctx.items, wx);
+      const input = buildEditorInput(reader, ctx.date, ctx.items, wx, ctx.printedRecently);
       const base = this.env.PUBLIC_URL ?? 'ranica.app/today';
       const facts = buildFacts({
         reader, date: ctx.date, issue: ctx.issue, generatedAt: ctx.generatedAt, items: ctx.items,

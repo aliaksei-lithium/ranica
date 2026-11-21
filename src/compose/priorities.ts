@@ -13,6 +13,8 @@ export const PRIORITY: Record<BlockId, 1 | 2 | 3 | 4 | 5> = {
   german: 2,
   news: 2,
   insight: 2,
+  /** Stadtgespräch: the topic everyone talks about, kept with the news. */
+  talk: 2,
   telegram: 3,
   sport: 3,
   qr: 4,

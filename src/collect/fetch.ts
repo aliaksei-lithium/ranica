@@ -1,6 +1,6 @@
 // One fetch per source with the collector limits from docs/02-plan.md §8:
 // timeout, 512 kB response cap, a plain User-Agent, ETag / Last-Modified support.
-import { parseRss } from './rss';
+import { parseRss, parseTrends } from './rss';
 import { parseTelegram } from './telegram';
 import { sourceUrl, type Source } from './sources';
 import type { Item } from './item';
@@ -59,7 +59,8 @@ export async function fetchCapped(
 
 /** Parse a fetched body with the parser for this source's kind. */
 export function parseSource(source: Source, text: string): Item[] {
-  return source.kind === 'rss' ? parseRss(text, source.id) : parseTelegram(text, source.id, source.channel, source.linkHost);
+  if (source.kind === 'rss') return source.format === 'trends' ? parseTrends(text, source.id) : parseRss(text, source.id);
+  return parseTelegram(text, source.id, source.channel, source.linkHost);
 }
 
 export async function collect(source: Source, fetcher: typeof fetch = fetch) {

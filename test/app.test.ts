@@ -27,7 +27,7 @@ describe('M0 routes with fake data', () => {
       expect(body).toContain(`data-block="${block}"`);
     }
     expect(body).toContain('Tuesday · 2026');
-    expect(body).toContain('leave by 12:20, U8 takes 18 min');
+    expect(body).toContain('St Martin’s Day'); // next holiday after the fake date, 3 Nov
     expect(body).not.toContain('more on page 2'); // long articles are on the front, nothing continues on page 2
   });
 
@@ -44,7 +44,7 @@ describe('M0 routes with fake data', () => {
     const { body } = await get('/today?day=thin');
     expect(count(body, /<article class="sheet[ "]/g)).toBe(1);
     expect(body).toContain('Weather unavailable <span class="unavailable__reason">Open-Meteo timeout</span>');
-    expect(body).toContain('No meetings today.');
+    expect(body).toContain('Holidays');
     for (const block of ['sport', 'hobby', 'onthisday', 'telegram']) expect(body).not.toContain(`data-block="${block}"`);
   });
 

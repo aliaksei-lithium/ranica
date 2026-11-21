@@ -10,6 +10,7 @@ export const ArchivePage: FC<{ lang: Lang; list: { date: string; issue: number }
       <div class="desk desk--stack">
         <nav class="toolbar">
           <a href="/today">{lang === 'de' ? 'Heute' : 'Today'}</a>
+          <a href="/admin" rel="nofollow">Admin</a>
         </nav>
         <article class="sheet sheet--archive" lang={lang}>
           <header class="masthead masthead--page2">

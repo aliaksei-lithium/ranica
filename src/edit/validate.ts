@@ -1,6 +1,6 @@
 // Editor contract (docs/02-plan.md §3.1): every id in the Brief must exist in the input, text is
 // clipped to what the layout holds, and an item is used at most once per page side.
-import type { Brief, NewsPick } from './brief';
+import type { Brief, NewsPick, Talk } from './brief';
 import { clip } from '../collect/text';
 
 /** "Germany/Deutschland" → the part in the reader's language (Sonnet once wrote both, 2026-11-08). */
@@ -25,14 +25,46 @@ export interface Validation {
   dropped: string[];
 }
 
+/** "Gen-Z-Proteste" and "gen z proteste" are one story. */
+const storyKey = (s?: string) => (s ?? '').toLowerCase().normalize('NFKD').replace(/[^\p{L}\p{N}]+/gu, '');
+
 export function validateBrief(b: Brief, known: KnownIds): Validation {
   const dropped: string[] = [];
   const keep = <T>(list: T[], ok: (x: T) => boolean, what: (x: T) => string) =>
     list.filter((x) => (ok(x) ? true : (dropped.push(what(x)), false)));
 
+  // One story once per edition, front and back: the editor tags every pick with a story key, and a
+  // second pick with the same key is dropped even when it comes from another source.
+  const stories = new Set<string>();
+  const newStory = (s?: string) => {
+    const k = storyKey(s);
+    if (!k) return true;
+    if (stories.has(k)) return false;
+    stories.add(k);
+    return true;
+  };
+
+  // Stadtgespräch first: its story wins over a news pick of the same story.
+  const front = new Set<string>();
+  let talk: Talk | null = null;
+  if (b.talk?.topic.trim() && b.talk.text.trim()) {
+    const id = b.talk.item_id && known.items.has(b.talk.item_id) ? b.talk.item_id : null;
+    if (b.talk.item_id && !id) dropped.push(`talk ${b.talk.item_id}`);
+    if (id) front.add(id);
+    newStory(b.talk.story);
+    talk = {
+      topic: clip(b.talk.topic.trim(), 60),
+      text: clip(b.talk.text.trim(), 340),
+      item_id: id,
+      also: b.talk.also.map((a) => a.trim()).filter(Boolean).slice(0, 4).map((a) => clip(a, 32)),
+      ...(b.talk.story ? { story: b.talk.story } : {}),
+    };
+  }
+
   const picks = (list: NewsPick[], used: Set<string>, title: number, summary: number, perRubric: number) => {
     const count = new Map<string, number>();
     return keep(list, (n) => known.items.has(n.item_id) && !used.has(n.item_id) && !!used.add(n.item_id), (n) => `news ${n.item_id}`)
+      .filter((n) => newStory(n.story) || (dropped.push(`same story ${n.item_id}`), false))
       .filter((n) => {
         const k = (count.get(n.rubric) ?? 0) + 1;
         count.set(n.rubric, k);
@@ -43,9 +75,9 @@ export function validateBrief(b: Brief, known: KnownIds): Validation {
 
   // Front page: at most 4 items per rubric (fit.js trims the 3rd/4th first), short summaries;
   // then one-liners. Back page: up to 5 items per rubric.
-  const front = new Set<string>();
   const news = picks(b.news, front, 80, 220, 4);
   const briefs = keep(b.briefs ?? [], (x) => known.items.has(x.item_id) && !front.has(x.item_id) && !!front.add(x.item_id), (x) => `brief ${x.item_id}`)
+    .filter((x) => newStory(x.story) || (dropped.push(`same story ${x.item_id}`), false))
     .slice(0, 8)
     .map((x) => ({ ...x, rubric: clip(rubricName(x.rubric, known.lang), 24), text: clip(x.text, 180) }));
   const back = new Set<string>(front);
@@ -64,6 +96,7 @@ export function validateBrief(b: Brief, known: KnownIds): Validation {
     brief: {
       ...b,
       headline: clip(b.headline, 60),
+      talk,
       weather_note: clip(b.weather_note, 120),
       agenda: keep(b.agenda, (a) => known.events.has(a.event_id), (a) => `event ${a.event_id}`),
       tasks: keep(b.tasks, (t) => known.tasks.has(t.task_id), (t) => `task ${t.task_id}`),

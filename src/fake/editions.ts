@@ -147,6 +147,12 @@ const en: Edition = {
       { channel: '@easy_german', summary: '4 posts, a new episode about the doctor',
         points: ["New episode: 'Beim Arzt', useful before the dentist"] },
     ],
+    talk: {
+      topic: 'Union stun Bayern in Köpenick',
+      text: "A header in the 89th minute ended Bayern's unbeaten run, 2–1 at the Alte Försterei. Köpenick celebrated until midnight, the S3 was packed, and 'Union – Bayern' topped Berlin's searches overnight.",
+      item_id: null,
+      also: ['Bahn strike vote', 'Til Schweiger on NDR', 'First frost warning'],
+    },
     insight:
       'Two deadlines collide this week: the contract and the flight prices. Sign today, and the December trip ' +
       'gets cheaper by Friday. Your German exam is in 12 days; the next three evenings are free.',
@@ -235,6 +241,12 @@ const de: Edition = {
       { channel: '@easy_german', summary: '4 Beiträge, eine neue Folge über den Arztbesuch',
         points: ['Neue Folge: „Beim Arzt“, passt vor dem Zahnarzt'] },
     ],
+    talk: {
+      topic: 'Union schlägt Bayern in Köpenick',
+      text: 'Ein Kopfball in der 89. Minute beendete die Serie der Bayern, 2:1 an der Alten Försterei. Köpenick feierte bis Mitternacht, die S3 war voll, und „Union – Bayern“ war über Nacht die meistgesuchte Frage in Berlin.',
+      item_id: null,
+      also: ['Urabstimmung bei der Bahn', 'Til Schweiger im NDR', 'Erste Frostwarnung'],
+    },
     insight:
       'Diese Woche treffen zwei Fristen zusammen: der Vertrag und die Flugpreise. Wenn du heute unterschreibst, ' +
       'wird die Dezember-Reise bis Freitag günstiger. Deine Prüfung ist in 12 Tagen, die nächsten drei Abende sind frei.',
