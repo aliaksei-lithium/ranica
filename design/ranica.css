@@ -414,6 +414,48 @@
   margin: 0;
 }
 
+/* ---------- Stadtgespräch (talk of the town): head of the news columns since 2026-11-21 ----------
+   A kicker label on ink, the topic in the display face, two or three sentences, then a line of
+   other topics. Between heavy and hairline rules, so it reads as its own box without a frame. */
+.talk {
+  border-top: var(--rule-heavy) solid var(--ink);
+  border-bottom: var(--rule-hair) solid var(--rule);
+  padding: var(--space-2) 0 var(--space-2);
+  break-inside: avoid;
+}
+.talk .label {
+  display: inline-block;
+  border-top: 0;
+  background: var(--ink);
+  color: var(--paper);
+  padding: 2pt 4pt 1.5pt;
+  margin: 0 0 var(--space-1);
+}
+.talk__topic {
+  display: block;
+  font-family: var(--font-display);
+  font-weight: 900;
+  font-size: calc(var(--fs-headline) * 1.45);
+  line-height: 1.1;
+  color: inherit;
+  text-decoration: none;
+}
+.talk__text { margin-top: 2pt; }
+.talk__also {
+  margin-top: var(--space-1);
+  font-family: var(--font-sans);
+  font-size: var(--fs-note);
+  line-height: var(--lh-note);
+}
+.talk__also-label {
+  font-weight: 600;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  font-size: var(--fs-tag);
+  color: var(--ink-muted);
+}
+.flow > .talk + .rubric { margin-top: var(--space-2); }
+
 /* ---------- Unavailable line ---------- */
 .unavailable {
   font-style: italic;

@@ -41,7 +41,7 @@ export const Doc: FC<{ lang: string; title: string; bodyClass: string; fit?: boo
   </html>
 );
 
-/** Links on screen (below the sheets in the web view, above them in the print view): languages stored for this day, web/print view, archive. */
+/** Links on screen (below the sheets in the web view, above them in the print view): languages stored for this day, web/print view, archive, admin. */
 export interface Nav {
   langs: Lang[];
   /** Path of this page without query, e.g. /today or /editions/2026-11-08. */
@@ -59,6 +59,7 @@ const Toolbar: FC<{ nav: Nav; lang: Lang; view: View }> = ({ nav, lang, view }) 
       {view === 'print' ? <a href={q(lang, 'web')}>Web</a> : <a href={q(lang, 'print')}>Print view</a>}
       {view === 'print' && <button type="button" onclick="print()">Print</button>}
       <a href="/editions">Archive</a>
+      <a href="/admin" rel="nofollow">Admin</a>
     </nav>
   );
 };

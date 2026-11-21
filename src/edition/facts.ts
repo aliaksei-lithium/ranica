@@ -3,7 +3,7 @@
 import type { Facts, Lang } from '../model';
 import type { UserItem } from '../db/queries';
 import type { WeatherFacts } from '../collect/weather';
-import { SOURCES } from '../collect/sources';
+import { SOURCES, isTrends } from '../collect/sources';
 import { clip } from '../collect/text';
 
 export interface Reader {
@@ -45,9 +45,14 @@ export interface EditorInput {
   weather: WeatherFacts['forEditor'] | null;
   items: EditorItem[];
   telegram: { channel: string; items: EditorItem[] }[];
+  /** Google Trends: what people in Berlin and Germany search for right now (not news). */
+  trending: { region: string; items: EditorItem[] }[];
+  /** Headlines printed in the last days' editions: not to be repeated without news. */
+  printed_recently: string[];
 }
 
 const TELEGRAM = new Map(SOURCES.flatMap((s) => (s.kind === 'telegram' ? [[s.id, `@${s.channel}`] as const] : [])));
+const TRENDS = new Map(SOURCES.flatMap((s) => (isTrends(s) ? [[s.id, s.region ?? s.name] as const] : [])));
 
 /** Local calendar date and HH:MM of `now` in a time zone. */
 export function localNow(now: Date, timezone: string): { date: string; time: string; hour: number } {
@@ -64,9 +69,9 @@ const toEditorItem = (i: UserItem): EditorItem => ({
   id: itemId(i), source: i.source, rubric: i.rubric, title: i.title, body: clip(i.body, 300), published: i.publishedAt,
 });
 
-export function buildEditorInput(reader: Reader, date: string, items: UserItem[], weather: WeatherFacts | null): EditorInput {
+export function buildEditorInput(reader: Reader, date: string, items: UserItem[], weather: WeatherFacts | null, printedRecently: string[] = []): EditorInput {
   const weekday = new Intl.DateTimeFormat('en-GB', { weekday: 'long', timeZone: 'UTC' }).format(new Date(`${date}T12:00:00Z`));
-  const news = items.filter((i) => !TELEGRAM.has(i.sourceId));
+  const news = items.filter((i) => !TELEGRAM.has(i.sourceId) && !TRENDS.has(i.sourceId));
   const channels = [...TELEGRAM].map(([sourceId, channel]) => ({
     channel,
     items: items.filter((i) => i.sourceId === sourceId).map(toEditorItem),
@@ -82,6 +87,12 @@ export function buildEditorInput(reader: Reader, date: string, items: UserItem[]
     weather: weather?.forEditor ?? null,
     items: news.map(toEditorItem),
     telegram: channels,
+    // Berlin first: the reader lives there.
+    trending: [...TRENDS].map(([sourceId, region]) => ({
+      region,
+      items: items.filter((i) => i.sourceId === sourceId).map((i) => ({ ...toEditorItem(i), body: clip(i.body, 400) })),
+    })).filter((t) => t.items.length),
+    printed_recently: printedRecently,
   };
 }
 

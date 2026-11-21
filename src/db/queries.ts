@@ -5,13 +5,14 @@ import type { Item } from '../collect/item';
 import type { Source } from '../collect/sources';
 import type { Reader } from '../edition/facts';
 import type { Edition, Lang } from '../model';
+import type { Brief } from '../edit/brief';
 
 export const ITEM_RETENTION_DAYS = 7;
 
 /** The part of a source that lives in `config_json`, with a stable key order. */
 export function sourceConfig(s: Source): string {
   return s.kind === 'rss'
-    ? JSON.stringify({ url: s.url, rubric: s.rubric ?? null })
+    ? JSON.stringify({ url: s.url, rubric: s.rubric ?? null, ...(s.format ? { format: s.format, region: s.region ?? null } : {}) })
     : JSON.stringify({ channel: s.channel, linkHost: s.linkHost ?? null });
 }
 
@@ -147,17 +148,31 @@ export interface SourceStatus {
   lastError: string | null;
   items: number;
   newest: string | null;
+  /** Distinct items of this source the editor printed (any `item_id` in the Brief) in the last USED_DAYS days' editions. */
+  used: number;
 }
+
+/** Window for SourceStatus.used; items are pruned after ITEM_RETENTION_DAYS, so it cannot be longer. */
+export const USED_DAYS = ITEM_RETENTION_DAYS;
 
 export async function sourceStatus(db: D1Database): Promise<SourceStatus[]> {
   const { results } = await db
     .prepare(
       `SELECT s.id, s.kind, s.name, s.active, s.last_fetch_at AS lastFetchAt, s.last_ok_at AS lastOkAt,
               s.last_status AS lastStatus, s.last_error AS lastError,
-              COUNT(i.id) AS items, MAX(i.published_at) AS newest
+              COUNT(i.id) AS items, MAX(i.published_at) AS newest, COALESCE(u.used, 0) AS used
        FROM source s LEFT JOIN item i ON i.source_id = s.id
-       GROUP BY s.id ORDER BY s.id`,
+       LEFT JOIN (
+         SELECT it.source_id, COUNT(DISTINCT it.id) AS used
+         FROM (SELECT CAST(substr(j.value, 2) AS INTEGER) AS item_id
+               FROM edition e, json_tree(e.brief_json) j
+               WHERE e.date >= date('now', ?1) AND j.key = 'item_id' AND j.type = 'text') p
+         JOIN item it ON it.id = p.item_id
+         GROUP BY it.source_id
+       ) u ON u.source_id = s.id
+       GROUP BY s.id ORDER BY s.active DESC, s.id`,
     )
+    .bind(`-${USED_DAYS} days`)
     .all<SourceStatus>();
   return results;
 }
@@ -200,7 +215,7 @@ export interface Settings {
 }
 
 export async function saveSettings(db: D1Database, userId: number, s: Settings): Promise<void> {
-  const langs = s.editionLangs.length ? s.editionLangs : ['en'];
+  const langs = s.editionLangs.length ? s.editionLangs : ['de'];
   await db
     .prepare('UPDATE user SET auto_refresh = ?2, auto_edition = ?3, edition_langs = ?4, wake_time = ?5 WHERE id = ?1')
     .bind(userId, s.autoRefresh ? 1 : 0, s.autoEdition ? 1 : 0, langs.join(','), s.wakeTime)
@@ -263,6 +278,41 @@ export async function loadEdition(db: D1Database, userId: number, opts: { date?:
   const row = results[0];
   if (!row) return null;
   return { date: row.date, lang: row.lang, langs: results.map((r) => r.lang), facts: JSON.parse(row.facts_json), brief: JSON.parse(row.brief_json) };
+}
+
+export interface RecentlyPrinted {
+  /** Every item id ("n…") printed in those editions, in any language. */
+  ids: string[];
+  /** Their headlines and one-liners, from one language per day (`lang` preferred), newest day first. */
+  titles: string[];
+}
+
+/**
+ * What the editions of the `days` days before `date` printed, so the next edition does not repeat
+ * it (review 2026-11-21: the youth protests ran on three days, twice on one page).
+ */
+export async function recentlyPrinted(db: D1Database, userId: number, date: string, lang: Lang, days = 2): Promise<RecentlyPrinted> {
+  const { results } = await db
+    .prepare(
+      `SELECT date, lang, brief_json FROM edition
+       WHERE user_id = ?1 AND status = 'ready' AND date < ?2 AND date >= date(?2, ?3)
+       ORDER BY date DESC, lang = ?4 DESC`,
+    )
+    .bind(userId, date, `-${days} days`, lang)
+    .all<{ date: string; lang: Lang; brief_json: string }>();
+  const ids = new Set<string>();
+  const titles: string[] = [];
+  const days_ = new Set<string>();
+  for (const r of results) {
+    const b = JSON.parse(r.brief_json) as Brief;
+    const picks = [...b.news, ...(b.briefs ?? []), ...b.back_news, ...b.deep, ...(b.talk?.item_id ? [{ item_id: b.talk.item_id }] : [])];
+    for (const p of picks) ids.add(p.item_id);
+    if (days_.has(r.date)) continue;
+    days_.add(r.date);
+    if (b.talk) titles.push(b.talk.topic);
+    titles.push(...b.news.map((n) => n.title), ...(b.briefs ?? []).map((x) => x.text), ...b.back_news.map((n) => n.title));
+  }
+  return { ids: [...ids], titles: [...new Set(titles)] };
 }
 
 export async function listEditions(db: D1Database, userId: number, limit = 60): Promise<{ date: string; issue: number }[]> {

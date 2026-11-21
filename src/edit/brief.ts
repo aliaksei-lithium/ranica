@@ -8,6 +8,21 @@ export interface NewsPick {
   title: string;
   /** ≤ 2 lines on the front page. */
   summary: string;
+  /** A short key for the underlying story, the same for every item about it; used to drop repeats. */
+  story?: string;
+}
+
+/** "Stadtgespräch": what Berlin and Germany talk about today (since 2026-11-21). */
+export interface Talk {
+  /** ≤ 60 chars, e.g. "Union schlägt Leipzig". */
+  topic: string;
+  /** 2–3 sentences, ≤ 340 chars: what it is and why people talk about it. */
+  text: string;
+  /** The news or trends item it links to, if any. */
+  item_id: string | null;
+  /** Up to 4 more topics in a few words each. */
+  also: string[];
+  story?: string;
 }
 
 export interface Brief {
@@ -20,7 +35,9 @@ export interface Brief {
   /** Front page news, up to 5 rubrics. */
   news: NewsPick[];
   /** One-line items that fill the rest of the page (absent in editions before 2026-11-08). */
-  briefs?: { rubric: string; item_id: string; text: string }[];
+  briefs?: { rubric: string; item_id: string; text: string; story?: string }[];
+  /** Absent in editions before 2026-11-21. */
+  talk?: Talk | null;
   /** `summary` is the one-line front-page digest; `points` are the back-page bullets. */
   telegram_digest: { channel: string; summary: string; points: string[] }[];
   /** 2–4 sentences, ≤ 400 chars. */

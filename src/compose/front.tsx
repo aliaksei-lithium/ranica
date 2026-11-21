@@ -4,7 +4,7 @@
 // advice here; those live on the back page. public/fit.js trims from the end if the sheet overflows.
 import type { FC } from 'hono/jsx';
 import type { Edition } from '../model';
-import type { NewsPick } from '../edit/brief';
+import type { NewsPick, Talk } from '../edit/brief';
 import { fit } from './priorities';
 import { signed, slug, t } from './i18n';
 import { Footer, Masthead, SunItems, Unavailable, quote } from './parts';
@@ -69,6 +69,31 @@ export const NewsRubric: FC<{ r: Rubric; more?: string; block?: 'news' | 'world'
     })}
   </section>
 );
+
+/** Stadtgespräch: what Berlin and Germany talk about today, at the head of the news columns. */
+export const TalkBlock: FC<{ talk: Talk; e: Edition }> = ({ talk, e }) => {
+  const L = t(e.facts.lang);
+  const item = talk.item_id ? e.facts.items.find((i) => i.id === talk.item_id) : undefined;
+  return (
+    <aside class="talk" id={slug(L.talk)} {...fit('talk')}>
+      <span class="label">{L.talk}</span>
+      {item ? (
+        <a class="talk__topic" href={item.url}>{talk.topic}</a>
+      ) : (
+        <span class="talk__topic">{talk.topic}</span>
+      )}
+      <p class="talk__text">
+        {talk.text}
+        {item && <span class="tag">{item.source}</span>}
+      </p>
+      {talk.also.length > 0 && (
+        <p class="talk__also">
+          <span class="talk__also-label">{L.talkAlso}</span> {talk.also.join(' · ')}
+        </p>
+      )}
+    </aside>
+  );
+};
 
 export const FrontPage: FC<{ e: Edition; kindle?: boolean }> = ({ e, kindle }) => {
   const { facts: f, brief: b } = e;
@@ -148,6 +173,7 @@ export const FrontPage: FC<{ e: Edition; kindle?: boolean }> = ({ e, kindle }) =
       </div>
 
       <div class="flow">
+        {b.talk && <TalkBlock talk={b.talk} e={e} />}
         {news.map((r) => (
           <NewsRubric r={r} long={long} />
         ))}

@@ -9,6 +9,7 @@ const newsPick = z.object({
   item_id: z.string().describe('id of an input item, e.g. "n12"'),
   title: z.string().describe('Headline in the reader language, at most 90 characters'),
   summary: z.string().describe('One or two sentences, at most 180 characters: what happened and its outcome or the stated view'),
+  story: z.string().describe('1-3 word key of the underlying story, identical for every item about the same event'),
 });
 
 // Kept small on purpose: structured outputs compile the schema into a grammar with a size limit
@@ -23,6 +24,13 @@ const word = z.object({
 });
 
 export const BriefSchema = z.object({
+  talk: z.object({
+    topic: z.string().describe('The one topic Berlin and Germany talk about today, at most 60 characters, a single topic; empty string if nothing stands out'),
+    text: z.string().describe('2-3 sentences, at most 320 characters: what it is and why people talk about it'),
+    item_id: z.string().describe('id of the news or trending item it is based on, or empty string'),
+    story: z.string().describe('story key, as for news'),
+    also: z.array(z.string()).describe('2-4 more talked-about topics, 1-4 words each'),
+  }).describe('Stadtgespraech: the one topic people talk about today, from the trending searches and the news'),
   headline: z.string().describe('The day in at most 60 characters; becomes the page title'),
   news: z.array(newsPick).describe('Front page: up to 4 rubrics with 2-3 items each, most important first; title at most 70 characters, summary one sentence of at most 140 characters'),
   briefs: z
@@ -30,6 +38,7 @@ export const BriefSchema = z.object({
       rubric: z.string(),
       item_id: z.string(),
       text: z.string().describe('What happened and its outcome or meaning, one or two lines, at most 160 characters'),
+      story: z.string().describe('story key, as for news'),
     }))
     .describe('4-8 stories with real news value, not used in news, grouped by rubric, most important first'),
   telegram_digest: z
@@ -58,9 +67,10 @@ export type BriefOutput = z.infer<typeof BriefSchema>;
 
 /** The editor's output as a full Brief: fields the schema leaves out are empty. */
 export function toBrief(o: BriefOutput): Brief {
-  const { new_word, on_this_day, word_of_day, ...rest } = o;
+  const { new_word, on_this_day, word_of_day, talk, ...rest } = o;
   return {
     ...rest,
+    talk: talk.topic && talk.text ? { topic: talk.topic, text: talk.text, item_id: talk.item_id || null, also: talk.also, story: talk.story } : null,
     weather_note: '',
     agenda: [],
     tasks: [],

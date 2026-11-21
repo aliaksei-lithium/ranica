@@ -5,13 +5,14 @@ import { SOURCES, type Source } from '../src/collect/sources';
 import { refreshSource } from '../src/collect/refresh';
 import type { Item } from '../src/collect/item';
 import {
-  insertItems, itemsForUser, pruneItems, recordFetch, retentionCutoff, sourceStatus, subscribeAllUsers, syncSources,
+  insertItems, itemsForUser, pruneItems, recentlyPrinted, recordFetch, retentionCutoff, sourceStatus, subscribeAllUsers, syncSources,
 } from '../src/db/queries';
 import type { RefreshOutput } from '../src/workflows/source-refresh';
 import worker from '../src/index';
 import { REFRESH_CRON } from '../src/scheduled';
 import tagesschauXml from './fixtures/rss-tagesschau.xml?raw';
 import telegramHtml from './fixtures/telegram-zerkalo.html?raw';
+import trendsXml from './fixtures/rss-trends-berlin.xml?raw';
 
 const db = env.DB;
 const NOW = new Date('2026-11-07T16:00:00Z');
@@ -37,7 +38,8 @@ function stubFeeds(override: (url: string) => Response | Error | undefined = () 
     const o = override(url);
     if (o instanceof Error) throw o;
     if (o) return o;
-    return new Response(url.startsWith('https://t.me/') ? telegramHtml : tagesschauXml, { headers: { etag: `"${url.length}"` } });
+    const body = url.startsWith('https://t.me/') ? telegramHtml : url.startsWith('https://trends.google.com/') ? trendsXml : tagesschauXml;
+    return new Response(body, { headers: { etag: `"${url.length}"` } });
   });
   return calls;
 }
@@ -49,25 +51,25 @@ describe('schema and source sync', () => {
   it('inserts all sources once and does not rewrite unchanged rows', async () => {
     expect(await syncSources(db, SOURCES)).toBe(SOURCES.length);
     expect(await syncSources(db, SOURCES)).toBe(0);
-    const renamed: Source[] = SOURCES.map((s) => (s.id === 'faz-inland' ? { ...s, name: 'F.A.Z.' } : s));
+    const renamed: Source[] = SOURCES.map((s) => (s.id === 'tagesspiegel-politik' ? { ...s, name: 'Der Tagesspiegel' } : s));
     expect(await syncSources(db, renamed)).toBe(1);
   });
 
   it('deactivates shared sources that left the list and reactivates them on return', async () => {
     await syncSources(db, SOURCES);
-    await syncSources(db, SOURCES.filter((s) => s.id !== 'berliner-zeitung'));
-    expect(await count(`SELECT active AS n FROM source WHERE id = 'berliner-zeitung'`)).toBe(0);
+    await syncSources(db, SOURCES.filter((s) => s.id !== 'rbb24'));
+    expect(await count(`SELECT active AS n FROM source WHERE id = 'rbb24'`)).toBe(0);
     await syncSources(db, SOURCES);
-    expect(await count(`SELECT active AS n FROM source WHERE id = 'berliner-zeitung'`)).toBe(1);
+    expect(await count(`SELECT active AS n FROM source WHERE id = 'rbb24'`)).toBe(1);
   });
 
-  it('subscribes the reader with each source rubric; Berliner Zeitung has none', async () => {
+  it('subscribes the reader with each source rubric; Telegram has none', async () => {
     await syncSources(db, SOURCES);
     expect(await subscribeAllUsers(db)).toBe(SOURCES.length);
     expect(await subscribeAllUsers(db)).toBe(0);
     const { results } = await db.prepare('SELECT source_id, rubric FROM subscription ORDER BY source_id').all<{ source_id: string; rubric: string | null }>();
     expect(Object.fromEntries(results.map((r) => [r.source_id, r.rubric]))).toMatchObject({
-      'berliner-zeitung': null, 'tagesspiegel-berlin': 'Berlin', 'tagesschau-ausland': 'World', 'faz-inland': 'Germany', 'tg-zerkalo': null,
+      'tagesspiegel-berlin': 'Berlin', 'tagesschau-ausland': 'World', 'tagesspiegel-politik': 'Germany', 'tg-zerkalo': null,
     });
   });
 
@@ -100,18 +102,48 @@ describe('items', () => {
   it('itemsForUser joins source name and rubric, newest first, capped per source', async () => {
     const at = NOW.toISOString();
     await insertItems(db, [1, 2, 3].map((n) => item({ hash: `h${n}`, title: `T${n}`, publishedAt: `2026-11-07T0${n}:00:00.000Z` })), at);
-    await insertItems(db, [item({ sourceId: 'berliner-zeitung', hash: 'bz1', publishedAt: '2026-11-07T05:00:00.000Z' })], at);
+    await insertItems(db, [item({ sourceId: 'rbb24', hash: 'bz1', publishedAt: '2026-11-07T05:00:00.000Z' })], at);
     const rows = await itemsForUser(db, 1, '2026-11-06T00:00:00.000Z', 2);
-    expect(rows.map((r) => [r.sourceId, r.title])).toEqual([['berliner-zeitung', 'Titel'], ['tagesschau-inland', 'T3'], ['tagesschau-inland', 'T2']]);
+    expect(rows.map((r) => [r.sourceId, r.title])).toEqual([['rbb24', 'Titel'], ['tagesschau-inland', 'T3'], ['tagesschau-inland', 'T2']]);
     expect(rows[1]).toMatchObject({ source: 'tagesschau', rubric: 'Germany' });
   });
 
+  it('sourceStatus counts the items each source had printed in recent editions', async () => {
+    await insertItems(db, [item(), item({ externalId: 'g2', hash: 'aaaa0002' })], NOW.toISOString());
+    const ids = (await db.prepare(`SELECT id FROM item ORDER BY id`).all<{ id: number }>()).results.map((r) => r.id);
+    const brief = { news: [{ item_id: `n${ids[0]}` }], briefs: [{ item_id: `n${ids[0]}` }], deep: [], hobby_fact: { item_id: null } };
+    const today = new Date().toISOString().slice(0, 10);
+    await db.prepare(`INSERT INTO edition (user_id, date, lang, issue, status, brief_json) VALUES (1, ?1, 'de', 1, 'ready', ?2)`).bind(today, JSON.stringify(brief)).run();
+    const by = new Map((await sourceStatus(db)).map((s) => [s.id, s]));
+    expect(by.get('tagesschau-inland')).toMatchObject({ items: 2, used: 1 }); // printed twice, counted once
+    expect(by.get('rbb24')).toMatchObject({ items: 0, used: 0 });
+    await db.prepare('DELETE FROM edition').run();
+  });
+
+  it('recentlyPrinted: ids of the two days before, titles from one language per day', async () => {
+    const b = (id: string, title: string, talk?: string) => JSON.stringify({
+      news: [{ item_id: id, title }], briefs: [{ item_id: 'n9', text: 'Kurz' }], back_news: [], deep: [],
+      ...(talk ? { talk: { topic: talk, text: 'x', item_id: 'n8', also: [] } } : {}),
+    });
+    const add = (date: string, lang: string, brief: string) =>
+      db.prepare(`INSERT INTO edition (user_id, date, lang, issue, status, brief_json) VALUES (1, ?1, ?2, 1, 'ready', ?3)`).bind(date, lang, brief).run();
+    await add('2026-11-21', 'de', b('n1', 'Heute', 'Heute'));
+    await add('2026-11-20', 'de', b('n2', 'Gestern', 'Union'));
+    await add('2026-11-20', 'en', b('n3', 'Yesterday'));
+    await add('2026-11-19', 'de', b('n4', 'Vorgestern'));
+    await add('2026-11-18', 'de', b('n5', 'Zu alt'));
+    const r = await recentlyPrinted(db, 1, '2026-11-21', 'de');
+    expect(r.ids.sort()).toEqual(['n2', 'n3', 'n4', 'n8', 'n9']);
+    expect(r.titles).toEqual(['Union', 'Gestern', 'Kurz', 'Vorgestern']);
+    await db.prepare('DELETE FROM edition').run();
+  });
+
   it('recordFetch keeps old validators when a fetch fails', async () => {
-    await recordFetch(db, 'faz-inland', { at: '2026-11-07T10:00:00.000Z', status: 200, etag: '"v1"' });
-    await recordFetch(db, 'faz-inland', { at: '2026-11-07T11:00:00.000Z', status: 503, error: 'HTTP 503' });
-    const [s] = (await sourceStatus(db)).filter((x) => x.id === 'faz-inland');
+    await recordFetch(db, 'tagesspiegel-politik', { at: '2026-11-07T10:00:00.000Z', status: 200, etag: '"v1"' });
+    await recordFetch(db, 'tagesspiegel-politik', { at: '2026-11-07T11:00:00.000Z', status: 503, error: 'HTTP 503' });
+    const [s] = (await sourceStatus(db)).filter((x) => x.id === 'tagesspiegel-politik');
     expect(s).toMatchObject({ lastOkAt: '2026-11-07T10:00:00.000Z', lastStatus: 503, lastError: 'HTTP 503' });
-    expect(await count(`SELECT COUNT(*) AS n FROM source WHERE id = 'faz-inland' AND etag = '"v1"'`)).toBe(1);
+    expect(await count(`SELECT COUNT(*) AS n FROM source WHERE id = 'tagesspiegel-politik' AND etag = '"v1"'`)).toBe(1);
   });
 });
 
@@ -129,14 +161,21 @@ describe('refreshSource', () => {
   it('records a 404 without throwing, throws on 503 for a retry', async () => {
     stubFeeds((url) => new Response('x', { status: url.includes('inland') ? 404 : 503 }));
     expect(await refreshSource(db, tagesschau, NOW)).toMatchObject({ status: 404, error: 'HTTP 404' });
-    await expect(refreshSource(db, SOURCES.find((s) => s.id === 'faz-ausland')!, NOW)).rejects.toThrow('faz-ausland: HTTP 503');
-    expect((await sourceStatus(db)).find((s) => s.id === 'faz-ausland')).toMatchObject({ lastStatus: 503 });
+    await expect(refreshSource(db, SOURCES.find((s) => s.id === 'handelsblatt-finanzen')!, NOW)).rejects.toThrow('handelsblatt-finanzen: HTTP 503');
+    expect((await sourceStatus(db)).find((s) => s.id === 'handelsblatt-finanzen')).toMatchObject({ lastStatus: 503 });
   });
 });
 
 describe('SourceRefreshWorkflow', () => {
   it('POST /admin/refresh runs every source; one failing source does not stop the others', async () => {
-    stubFeeds((url) => (url.includes('faz.net/rss/aktuell/politik/inland') ? new Error('connect timeout') : undefined));
+    // The workflow keeps items of the last 7 days from the real clock: serve the fixtures as of today.
+    const today = new Date();
+    const iso = today.toISOString().slice(0, 10);
+    const rfc = today.toUTCString().slice(5, 16); // "21 Nov 2026"
+    const fresh = (s: string) => s.replaceAll('2026-11-07', iso).replaceAll('07 Nov 2026', rfc).replaceAll('2026-11-21', iso).replaceAll('21 Nov 2026', rfc);
+    stubFeeds((url) =>
+      url.includes('tagesspiegel.de/contentexport/feed/politik') ? new Error('connect timeout')
+        : new Response(fresh(url.startsWith('https://t.me/') ? telegramHtml : url.startsWith('https://trends.google.com/') ? trendsXml : tagesschauXml)));
     await using wf = await introspectWorkflow(env.SOURCE_REFRESH);
     await wf.modifyAll(async (m) => {
       await m.disableRetryDelays();
@@ -153,13 +192,13 @@ describe('SourceRefreshWorkflow', () => {
     expect(out.synced).toBe(SOURCES.length);
     expect(out.subscribed).toBe(SOURCES.length);
     const by = new Map(out.results.map((r) => [r.id, r]));
-    expect(by.get('faz-inland')).toMatchObject({ status: null, inserted: 0 });
-    expect(by.get('faz-inland')!.error).toContain('connect timeout');
+    expect(by.get('tagesspiegel-politik')).toMatchObject({ status: null, inserted: 0 });
+    expect(by.get('tagesspiegel-politik')!.error).toContain('connect timeout');
     expect(by.get('tg-zerkalo')).toMatchObject({ status: 200, inserted: 2 });
     expect(by.get('tagesspiegel-berlin')).toMatchObject({ status: 200, inserted: 2 });
 
     const status = await (await exports.default.fetch('https://ranica.test/admin/sources?key=test-key')).json<{ id: string; items: number; lastError: string | null }[]>();
-    expect(status.find((s) => s.id === 'faz-inland')!.lastError).toContain('connect timeout');
+    expect(status.find((s) => s.id === 'tagesspiegel-politik')!.lastError).toContain('connect timeout');
     expect(status.filter((s) => s.items > 0)).toHaveLength(SOURCES.length - 1);
   });
 });

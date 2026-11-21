@@ -9,7 +9,7 @@ import { runEditor, EDITOR_MODEL, EditorRefusal } from '../src/edit/editor';
 import type { BriefOutput } from '../src/edit/schema';
 import type { Brief } from '../src/edit/brief';
 import type { UserItem } from '../src/db/queries';
-import { insertItems, loadEdition, subscribeAllUsers, syncSources } from '../src/db/queries';
+import { insertItems, loadEdition, recentlyPrinted, subscribeAllUsers, syncSources } from '../src/db/queries';
 import { SOURCES } from '../src/collect/sources';
 import worker from '../src/index';
 import { app } from '../src/app';
@@ -82,8 +82,9 @@ const brief = (over: Partial<Brief> = {}): Brief => ({
 const output = (): BriefOutput => {
   const b = brief();
   return {
-    headline: b.headline, news: b.news, briefs: [], telegram_digest: b.telegram_digest,
-    insight: b.insight, tomorrow: b.tomorrow, deep: b.deep, back_news: b.back_news,
+    headline: b.headline, news: b.news.map((n) => ({ ...n, story: n.title })), briefs: [], telegram_digest: b.telegram_digest,
+    insight: b.insight, tomorrow: b.tomorrow, deep: b.deep, back_news: b.back_news.map((n) => ({ ...n, story: n.title })),
+    talk: { topic: 'Union schlägt Leipzig', text: 'Ganz Köpenick feiert.', item_id: '', story: 'Union', also: ['Til Schweiger'] },
     new_word: { de: 'der Titel', en: 'title', example: 'Der Titel ist kurz.', from_item_id: 'n1' },
     on_this_day: { text: 'Morgenstund hat Gold im Mund.', author: 'Sprichwort' },
     word_of_day: { de: '', en: '', example: '', extra: '' },
@@ -207,6 +208,7 @@ describe('Claude editor', () => {
     expect(r.brief.german.new_word).toMatchObject({ de: 'der Titel', from_item_id: 'n1' });
     expect(r.brief.word_of_day).toBeNull(); // empty strings mean "none"
     expect(r.brief).toMatchObject({ agenda: [], tasks: [], sport: null, hobby_fact: null });
+    expect(r.brief.talk).toMatchObject({ topic: 'Union schlägt Leipzig', item_id: null, also: ['Til Schweiger'] });
     const schema = JSON.stringify((sent.output_config as { format: { schema: unknown } }).format.schema);
     expect(schema).not.toContain('anyOf'); // nullable unions blow up the compiled grammar
     expect(r).toMatchObject({ model: EDITOR_MODEL, tokensIn: 9000, tokensOut: 3000, costCents: 4.8 });
@@ -244,7 +246,7 @@ describe('EditionWorkflow', () => {
     await insertItems(db, [
       { sourceId: 'tagesschau-inland', externalId: 'a', url: 'https://t/1', title: 'Bundestag', body: 'Text.', publishedAt: now, hash: 'a1' },
       { sourceId: 'tagesspiegel-berlin', externalId: 'b', url: 'https://t/2', title: 'BVG', body: 'Text.', publishedAt: now, hash: 'b1' },
-      { sourceId: 'faz-ausland', externalId: 'c', url: 'https://t/3', title: 'Welt', body: 'Text.', publishedAt: now, hash: 'c1' },
+      { sourceId: 'tagesschau-ausland', externalId: 'c', url: 'https://t/3', title: 'Welt', body: 'Text.', publishedAt: now, hash: 'c1' },
     ], now);
   });
   afterEach(() => vi.unstubAllGlobals());
@@ -377,10 +379,42 @@ describe('settings, languages and manual rebuild', () => {
   });
 
   it('the settings page needs the key and shows the switches', async () => {
-    expect((await exports.default.fetch('https://ranica.test/admin')).status).toBe(404);
+    const login = await exports.default.fetch('https://ranica.test/admin');
+    expect(login.status).toBe(200);
+    const form = await login.text();
+    expect(form).toContain('action="/admin/login"');
+    expect(form).not.toContain('name="autoRefresh"');
+    expect((await exports.default.fetch('https://ranica.test/admin/sources')).status).toBe(404); // the JSON routes stay hidden
     const html = await (await exports.default.fetch('https://ranica.test/admin?key=test-key')).text();
     expect(html).toContain('name="autoRefresh"');
     expect(html).toContain('Rebuild today');
+    expect(html).toContain('action="/admin/rebuild?key=test-key"');
+  });
+
+  it('the login form remembers the key in a cookie; a wrong key is refused', async () => {
+    const post = (key: string) =>
+      exports.default.fetch('https://ranica.test/admin/login', { method: 'POST', body: new URLSearchParams([['key', key]]), redirect: 'manual' });
+    const wrong = await post('nope');
+    expect(wrong.headers.get('location')).toBe('/admin?wrong=1');
+    expect(wrong.headers.get('set-cookie')).toBeNull();
+    expect((await exports.default.fetch('https://ranica.test/admin?wrong=1')).status).toBe(401);
+
+    const ok = await post('test-key');
+    expect(ok.headers.get('location')).toBe('/admin');
+    const setCookie = ok.headers.get('set-cookie') ?? '';
+    expect(setCookie).toMatch(/admin_key=test-key;.*HttpOnly/);
+    const cookie = setCookie.split(';')[0]!;
+    const html = await (await exports.default.fetch('https://ranica.test/admin', { headers: { cookie } })).text();
+    expect(html).toContain('action="/admin/rebuild"'); // no key in the URLs
+    expect(html).toContain('Log out');
+    const rebuildPage = await exports.default.fetch('https://ranica.test/admin/settings', {
+      method: 'POST', headers: { cookie }, body: new URLSearchParams([['lang', 'de'], ['wakeTime', '07:00']]), redirect: 'manual',
+    });
+    expect(rebuildPage.headers.get('location')).toBe('/admin');
+  });
+
+  it('the page links to admin', async () => {
+    expect(await (await exports.default.fetch('https://ranica.test/editions')).text()).toContain('href="/admin"');
   });
 
   it('Rebuild now refreshes sources, then builds every chosen language; /today switches language', async () => {
@@ -448,5 +482,78 @@ describe('review 2026-11-09: no repeats, three days, German word list', () => {
     expect(back.match(/class="week__day"/g)).toHaveLength(3); // next three days
     expect(back).toContain('die Nominierung');
     expect(back).toContain('harder words from today');
+  });
+});
+
+describe('review 2026-11-21: Stadtgespräch, one story once, nothing from the last two days', () => {
+  const known = { lang: 'de' as const, items: new Set(['n1', 'n2', 'n3', 'n4', 'n7']), events: new Set<string>(), tasks: new Set<string>(), cards: new Set<string>(), channels: new Set<string>() };
+
+  it('trending searches go to the editor apart from the news, Berlin first, with recent headlines', () => {
+    const trend = (id: number, sourceId: string) => userItem(id, { sourceId, source: 'Google Trends', rubric: null, title: `trend ${id}`, body: '500+ searches.' });
+    const input = buildEditorInput(reader, DATE, [...items, trend(7, 'trends-de'), trend(8, 'trends-berlin')], null, ['Jugendproteste in Dutzenden Städten']);
+    expect(input.items.map((i) => i.id)).not.toContain('n7');
+    expect(input.trending.map((t) => [t.region, t.items.map((i) => i.id)])).toEqual([['Berlin', ['n8']], ['Deutschland', ['n7']]]);
+    expect(input.printed_recently).toEqual(['Jugendproteste in Dutzenden Städten']);
+    expect(fallbackBrief(input).talk).toBeNull();
+    expect(fallbackBrief(input).news.map((n) => n.item_id)).not.toContain('n8');
+  });
+
+  it('the Stadtgespräch story wins; a second pick of the same story is dropped everywhere', () => {
+    const { brief: b, dropped } = validateBrief(brief({
+      talk: { topic: 'Gen Z auf der Straße', text: 'Zehntausende Jugendliche demonstrieren.', item_id: 'n4', story: 'Gen-Z-Proteste', also: ['Til Schweiger', '', 'a', 'b', 'c'] },
+      news: [
+        { rubric: 'Deutschland', item_id: 'n1', title: 'Jugendliche demonstrieren', summary: '.', story: 'gen z proteste' },
+        { rubric: 'Berlin', item_id: 'n2', title: 'Senat', summary: '.', story: 'Senat' },
+        { rubric: 'Berlin', item_id: 'n4', title: 'Talk item again', summary: '.', story: 'anders' },
+      ],
+      briefs: [{ rubric: 'Berlin', item_id: 'n7', text: 'Senat, anders erzählt', story: 'SENAT' }],
+      back_news: [{ rubric: 'Berlin', item_id: 'n3', title: '„Gen Z regelt“-Demo zieht durch Berlin', summary: '.', story: 'Gen-Z-Proteste' }],
+    }), known);
+    expect(b.talk).toMatchObject({ topic: 'Gen Z auf der Straße', item_id: 'n4', also: ['Til Schweiger', 'a', 'b', 'c'] });
+    expect(b.news.map((n) => n.item_id)).toEqual(['n2']);
+    expect(b.briefs).toEqual([]);
+    expect(b.back_news).toEqual([]);
+    expect(dropped).toEqual(expect.arrayContaining(['same story n1', 'news n4', 'same story n7', 'same story n3']));
+    expect(validateBrief(brief({ talk: { topic: 'x', text: 'y', item_id: 'n99', also: [] } }), known).brief.talk!.item_id).toBeNull();
+  });
+
+  it('the front page opens the news with the Stadtgespräch', async () => {
+    const { renderEdition } = await import('../src/compose/compose');
+    const facts = buildFacts({ reader: { ...reader, locale: 'de' }, date: DATE, issue: 1, generatedAt: '06:00', items, weather: null, publicUrl: 'x/today' });
+    const html = renderEdition({ facts, brief: brief({ talk: { topic: 'Union schlägt Leipzig', text: 'Köpenick feiert.', item_id: 'n2', also: ['Til Schweiger', 'Gladbach – BVB'] } }) }, 'print');
+    const flow = html.slice(html.indexOf('class="flow"'));
+    expect(flow.indexOf('class="talk"')).toBeLessThan(flow.indexOf('class="rubric"'));
+    expect(html).toContain('Stadtgespräch');
+    expect(html).toContain('href="https://www.tagesschau.de/2.html">Union schlägt Leipzig</a>');
+    expect(html).toContain('Til Schweiger · Gladbach – BVB');
+    expect(html).toContain('data-block="talk" data-priority="2"');
+  });
+
+  it('the workflow leaves out items printed yesterday and tells the editor their headlines', async () => {
+    const db = env.DB;
+    await db.batch(['DELETE FROM edition', 'DELETE FROM item', 'DELETE FROM subscription', 'DELETE FROM source', 'DELETE FROM profile', 'DELETE FROM user'].map((q) => db.prepare(q)));
+    await db.prepare(`INSERT INTO user (id, name, city, lat, lon, locale, learner_level, wake_time) VALUES (1, 'Reader', 'Berlin', 52.52, 13.405, 'en', 'B1', '07:00')`).run();
+    await syncSources(db, SOURCES);
+    await subscribeAllUsers(db);
+    const now = new Date().toISOString();
+    await insertItems(db, [
+      { sourceId: 'tagesschau-inland', externalId: 'old', url: 'https://t/old', title: 'Printed yesterday', body: 'Text.', publishedAt: now, hash: 'o1' },
+      { sourceId: 'tagesschau-inland', externalId: 'new', url: 'https://t/new', title: 'Fresh story', body: 'Text.', publishedAt: now, hash: 'n1' },
+    ], now);
+    const old = await db.prepare(`SELECT id FROM item WHERE external_id = 'old'`).first<{ id: number }>();
+    const yesterday = new Date(Date.parse(`${DATE}T12:00:00Z`) - 86_400_000).toISOString().slice(0, 10);
+    await db.prepare(`INSERT INTO edition (user_id, date, lang, issue, status, facts_json, brief_json) VALUES (1, ?1, 'en', 1, 'ready', '{}', ?2)`)
+      .bind(yesterday, JSON.stringify(brief({ news: [{ rubric: 'Germany', item_id: `n${old!.id}`, title: 'Printed yesterday', summary: '.' }], back_news: [], deep: [] }))).run();
+    expect((await recentlyPrinted(db, 1, DATE, 'en')).titles).toEqual(['Printed yesterday']);
+    vi.stubGlobal('fetch', async () => new Response('down', { status: 503 }));
+    await using wf = await introspectWorkflow(env.EDITION);
+    await wf.modifyAll(async (m) => { await m.disableRetryDelays(); });
+    await exports.default.fetch(`https://ranica.test/admin/edition?key=test-key&date=${DATE}`, { method: 'POST' });
+    const [instance] = await wf.get();
+    await instance!.waitForStatus('complete');
+    expect(((await instance!.getOutput()) as EditionOutput).items).toBe(1);
+    const e = await loadEdition(db, 1, { date: DATE });
+    expect(e!.brief.news.map((n) => n.title)).toEqual(['Fresh story']);
+    vi.unstubAllGlobals();
   });
 });
