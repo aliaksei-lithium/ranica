@@ -12,6 +12,7 @@
 <p align="center">
   <a href="https://github.com/aliaksei-lithium/ranica/actions/workflows/ci.yml"><img src="https://github.com/aliaksei-lithium/ranica/actions/workflows/ci.yml/badge.svg" alt="CI"></a>
   <a href="https://github.com/aliaksei-lithium/ranica/actions/workflows/deploy.yml"><img src="https://github.com/aliaksei-lithium/ranica/actions/workflows/deploy.yml/badge.svg" alt="Deploy"></a>
+  <a href="https://zeitung.aliaksei.xyz/today"><img src="https://img.shields.io/badge/read-zeitung.aliaksei.xyz-111111" alt="zeitung.aliaksei.xyz"></a>
   <img src="https://img.shields.io/badge/runs%20on-Cloudflare%20Workers-111111" alt="Cloudflare Workers">
   <img src="https://img.shields.io/badge/app-macOS%20·%20iPhone%20·%20web-111111" alt="macOS, iPhone, web">
 </p>
@@ -20,8 +21,8 @@
 
 ## Get it
 
-Open **[ranica.aliaksei-zhynhiarouski.workers.dev/today](https://ranica.aliaksei-zhynhiarouski.workers.dev/today)**
-and install it as an app:
+Open **[zeitung.aliaksei.xyz/today](https://zeitung.aliaksei.xyz/today)** and install it as an app
+(the old address, `ranica.aliaksei-zhynhiarouski.workers.dev`, still works):
 
 - **macOS** — in Safari choose **File ▸ Add to Dock**; in Chrome or Edge click the install icon in the address bar.
 - **iPhone** — in Safari tap **Share ▸ Add to Home Screen**.

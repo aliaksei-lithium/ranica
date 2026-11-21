@@ -76,15 +76,17 @@ GitHub Actions (`.github/workflows/`):
 
 - **CI** (every push and PR): typecheck, tests, `wrangler deploy --dry-run`, then renders all pages and
   uploads them as the `ranica-pages` artifact (A4 PDFs, PNGs, Kindle, e-ink) — download it from the run page.
-- **Deploy**: push to `main` → tests → `wrangler deploy` to `https://ranica.<your-subdomain>.workers.dev`;
+- **Deploy**: push to `main` → tests → `wrangler deploy` to the custom domain in `wrangler.jsonc` `routes`
+  (here `zeitung.aliaksei.xyz`) and to `https://ranica.<your-subdomain>.workers.dev`;
   pull request → `wrangler versions upload --preview-alias pr-<n>` (a preview URL, production untouched);
   "Run workflow" deploys any branch by hand.
 
 One-time setup:
 
 1. Cloudflare dashboard → Workers & Pages: pick a `workers.dev` subdomain if you have none yet.
-2. My Profile → API Tokens → Create Token → template **Edit Cloudflare Workers** (your account, all zones
-   or none). Copy the token. Copy the **Account ID** from the Workers & Pages overview.
+2. My Profile → API Tokens → Create Token → template **Edit Cloudflare Workers** (your account, and the
+   zone of your custom domain — without zone access the deploy can't attach it; drop `routes` from
+   `wrangler.jsonc` if you have no domain). Copy the token. Copy the **Account ID** from the Workers & Pages overview.
 3. GitHub repo → Settings → Secrets and variables → Actions → New repository secret:
    `CLOUDFLARE_API_TOKEN` and `CLOUDFLARE_ACCOUNT_ID`.
 4. Create a `main` branch from this one (and make it the default branch). The first push to `main`
