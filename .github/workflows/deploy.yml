@@ -1,5 +1,5 @@
 # Deploys the Worker to Cloudflare (docs/02-plan.md §5, CI/CD).
-#   push to main        → tests, then `wrangler deploy` (production, workers.dev)
+#   push to main        → tests, then `wrangler deploy` (production: zeitung.aliaksei.xyz + workers.dev)
 #   pull request        → `wrangler versions upload` with a preview alias pr-<number>
 #   manual run          → deploy the selected branch
 # Needs two repository secrets: CLOUDFLARE_API_TOKEN and CLOUDFLARE_ACCOUNT_ID (see README › Deploy).
@@ -46,7 +46,10 @@ jobs:
             exit 0
           fi
           npx wrangler deploy 2>&1 | tee deploy.log
-          url=$(grep -oE 'https://[a-z0-9.-]+\.workers\.dev' deploy.log | head -1)
+          # The custom domain from wrangler.jsonc routes; the workers.dev URL if there is none.
+          domain=$(grep -oE '^ +[a-z0-9.-]+ \(custom domain\)' deploy.log | head -1 | awk '{print $1}')
+          url=${domain:+https://$domain}
+          url=${url:-$(grep -oE 'https://[a-z0-9.-]+\.workers\.dev' deploy.log | head -1)}
           echo "url=$url" >> "$GITHUB_OUTPUT"
           echo "Deployed: $url/today" >> "$GITHUB_STEP_SUMMARY"
 

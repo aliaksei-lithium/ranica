@@ -8,6 +8,9 @@
   "compatibility_date": "2026-10-01",
   "compatibility_flags": ["nodejs_compat"],
   "build": { "command": "node scripts/sync-design.mjs" },
+  // zeitung.aliaksei.xyz is the main address; the workers.dev one keeps serving too, so installed
+  // apps and old links still work. The custom domain creates its own DNS record and certificate.
+  "routes": [{ "pattern": "zeitung.aliaksei.xyz", "custom_domain": true }],
   "workers_dev": true,
   "preview_urls": true,
   "assets": {
@@ -35,7 +38,7 @@
     "EditionWorkflow": { "type": "workflow", "name": "edition" }
   },
   "vars": {
-    "PUBLIC_URL": "ranica.aliaksei-zhynhiarouski.workers.dev/today",
+    "PUBLIC_URL": "zeitung.aliaksei.xyz/today",
     // Editor model: claude-sonnet-5-5 (default), claude-haiku-5-5 (cheapest) or claude-opus-5-5.
     "EDITOR_MODEL": "claude-sonnet-5-5"
     // "AI_GATEWAY_URL": "https://gateway.ai.cloudflare.com/v1/<account id>/<gateway>/anthropic"
